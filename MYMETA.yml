@@ -1,0 +1,38 @@
+---
+abstract: 'Explore clinical cohorts and search for entities and variables of interest'
+author:
+  - 'Abhishek Dixit <adixit@cpan.org>'
+build_requires:
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 0
+generated_by: 'ExtUtils::MakeMaker version 6.76, CPAN::Meta::Converter version 2.120351'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: CohortExplorer
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  CLI::Framework: 0
+  Config::General: 0
+  DBI: 0
+  Exception::Class::TryCatch: 0
+  FileHandle: 0
+  LWP::UserAgent: 0
+  Log::Log4perl: 0
+  MIME::Base64: 0
+  POSIX: 0
+  SQL::Abstract::More: 0
+  Statistics::Descriptive: 0
+  Term::ReadKey: 0
+  Test::More: 0
+  Text::ASCIITable: 0
+  Text::CSV_XS: 0
+  Tie::IxHash: 0
+  Time::HiRes: 0
+version: 0.01
