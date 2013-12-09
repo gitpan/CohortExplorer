@@ -18,11 +18,6 @@ sub usage_text {
 
 }
 
-sub option_spec {
-
-	# This command takes no options or arguments
-}
-
 sub validate {
 
 	my ( $self, $opts, @args ) = @_;
@@ -43,7 +38,7 @@ sub run {
 
 	my $tables = $cache->{datasource}->tables();
 
-   # Get tables in the datasource with 'table' as the first column followed by table attributes
+        # Get tables in the datasource with 'table' as the first column followed by table attributes
 	my @columns = (
 		'table',
 		grep ( !/^table$/, keys %{ $tables->{ ( keys %$tables )[-1] } } )
@@ -94,11 +89,11 @@ This method returns the usage information for the command.
 
 =head2 validate( $opts, @args )
 
-This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exception> if an argument is supplied to this command because this command does not accept any arguments.
+This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exceptions> if an argument is supplied to this command because this command does not accept any arguments.
 
 =head2 run( $opts, @args )
 
-This method attempts to retrieve the table information and entity (count) from the datasource class and returns it to the L<CohortExplorer::Application>.
+This method attempts to retrieve the table information and entity (count) from the datasource class and returns them to L<CohortExplorer::Application>.
 
 =head1 DEPENDENCIES
 
@@ -109,6 +104,8 @@ L<CLI::Framework::Exceptions>
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Find>
 

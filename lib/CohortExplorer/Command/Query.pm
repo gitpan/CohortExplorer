@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 30;
@@ -21,7 +21,7 @@ BEGIN {
 	# Read command history file
 	my $username = getlogin() || getpwuid($<) || $ENV{LOGNAME} || $ENV{USER};
 	$COMMAND_HISTORY_FILE =
-	  ( $username eq 'root' ? '/root' : "/home/" . $username )
+	  ( $username eq 'root' ? '/root' : '/home/' . $username )
 	  . "/.CohortExplorer_History";
 
 	FileHandle->new( '>>' . $COMMAND_HISTORY_FILE )
@@ -50,12 +50,12 @@ sub option_spec {
 
 	(
 		[],
-		[ 'cond|c=s%'      => 'impose condition(s)' ],
+		[ 'cond|c=s%'      => 'impose condition(s)'                         ],
 		[ 'out|o=s'        => 'provide output directory', { required => 1 } ],
-		[ 'save-command|s' => 'save command' ],
-		[ 'stats|S'        => 'show summary statistics' ],
-		[ 'export|e=s@'    => 'export tables by name' ],
-		[ 'export-all|a'   => 'export all tables' ],
+		[ 'save-command|s' => 'save command'                                ],
+		[ 'stats|S'        => 'show summary statistics'                     ],
+		[ 'export|e=s@'    => 'export tables by name'                       ],
+		[ 'export-all|a'   => 'export all tables'                           ],
 		[]
 	);
 }
@@ -119,7 +119,7 @@ sub validate {
 		  unless ( grep( /^$var$/, @vars ) );
 	}
 
-    # Condition can be imposed on all variables including Entity_ID and Visit (if applicable)
+        # Condition can be imposed on all variables including Entity_ID and Visit (if applicable)
 	for my $var ( keys %{ $opts->{cond} } ) {
 
 		throw_cmd_validation_exception(
@@ -131,10 +131,9 @@ sub validate {
 /^\{\'(=|\!=|>|>=|<|<=|between|not_between|like|not_like|in|not_in|regexp)\',(\[(\'[^,\`]+\',?){2,}\]|\'[^\`]+\'|undef)\}$/;
 
 		# Validating SQL conditions
+                if ( $opr && $val ) {
 
-		if ( $opr && $val ) {
-
-            # Operators (between, not_between, in and not_in) require array but for others it is optional
+                        # Operators (between, not_between, in and not_in) require array but for others it is optional
 			if ( $opr =~ /(between|in)/ ) {
 				throw_cmd_validation_exception(
 					error => "Expecting array for '$opr' in '$val'" )
@@ -156,9 +155,9 @@ sub run {
 	# Overall running of the command
 	my ( $self, $opts, @args ) = @_;
 	my $cache = $self->cache->get('cache');
-	my $result_set = $self->_process( $opts, $cache, @args );
+	my $result_set = $self->process( $opts, $cache, @args );
 
-	$self->_save_command( $opts, $cache, @args ) if ( $opts->{save_command} );
+	$self->save_command( $opts, $cache, @args ) if ( $opts->{save_command} );
 
 	# If the result-set is not empty
 	if (@$result_set) {
@@ -179,12 +178,12 @@ sub run {
 				'auto_diag'   => 1
 			}
 		);
-		$self->_export_data( $opts, $cache, $result_set, $dir, $csv, @args );
+		$self->export_data( $opts, $cache, $result_set, $dir, $csv, @args );
 
 		return {
 			headingText => 'summary statistics',
 			rows =>
-			  $self->_summary_stats( $opts, $cache, $result_set, $dir, $csv )
+			  $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
 		  }
 		  if ( $opts->{stats} );
 	}
@@ -192,21 +191,21 @@ sub run {
 	return undef;
 }
 
-sub _process {
+sub process {
 
 	my ( $self, $opts, $cache, @args ) = @_;
 
 	my $datasource = $cache->{datasource};
 	my $sqla       = $datasource->sqla();
+ 
+        # --- PREPARE QUERY PARAMETERS FROM CONDITION OPTION AND ARGS ---
 
-	# --- PREPARE QUERY PARAMETERS FROM CONDITION OPTION AND ARGS ---
-
-    # Query parameters can be static, dynamic or both
-    # Static type is applicable to 'standard' datasource but it may also be applicable
-    # to 'longitudinal' datasource provided the datasource contains tables which
-    # are independent of visits (i.e. static tables). Dynamic type is associated
-    # with longitudinal datasources only
-    my $param = $self->get_query_parameters( $opts, $datasource, @args );
+        # Query parameters can be static, dynamic or both
+        # Static type is applicable to 'standard' datasource but it may also be applicable
+        # to 'longitudinal' datasource provided the datasource contains tables which
+        # are independent of visits (i.e. static tables). Dynamic type is associated
+        # with longitudinal datasources only
+        my $param = $self->get_query_parameters( $opts, $datasource, @args );
 
 	my ( $stmt, $var, $sth, @rows );
 
@@ -257,8 +256,8 @@ s/(\?)/$count++ == $var_placeholder[$_]-$_ ? '`'.$param->{$type}{bind}->[$var_pl
 
 	else {    # both static and dynamic parameters are present
 
-        # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
-        # Inner join is done when conditions are imposed on static tables alone
+                # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
+                # Inner join is done when conditions are imposed on static tables alone
 		$stmt =
 		    'SELECT dynamic.Entity_ID, '
 		  . join( ', ', map { @{ $var->{$_} } } keys %$var )
@@ -303,7 +302,7 @@ s/(\?)/$count++ == $var_placeholder[$_]-$_ ? '`'.$param->{$type}{bind}->[$var_pl
 	return \@rows;
 }
 
-sub _save_command {
+sub save_command {
 
 	my ( $self, $opts, $cache, @args ) = @_;
 	my $alias = $cache->{datasource}->alias();
@@ -350,7 +349,7 @@ sub _save_command {
 	}
 }
 
-sub _export_data {
+sub export_data {
 
 	my ( $self, $opts, $cache, $result_set, $dir, $csv, @args ) = @_;
 
@@ -417,7 +416,7 @@ sub _export_data {
 		  0 .. $#chunk;
 
 		for my $table ( @{ $opts->{export} } ) {
-                        # Ensure the user has access to at least one variable in the table being exported ...
+                        # Ensure the user has access to at least one variable in the table to be exported ...
 			if (
 				grep ( /^$table\..+$/,
 					keys %{ $cache->{datasource}->variables() } ) )
@@ -453,7 +452,7 @@ sub _export_data {
 	}
 }
 
-sub _summary_stats {
+sub summary_stats {
 
 	my ( $self, $opts, $cache, $result_set, $dir, $csv ) = @_;
 
@@ -484,16 +483,16 @@ sub _summary_stats {
 	print STDERR "Computing summary statistics for "
 	  . ( $#col + 1 )
 	  . " query variable(s): "
-	  . join( ', ', @col ) . " \n\n"
+	  . join( ', ', @col ) . " ... \n\n"
 	  if ( $cache->{verbose} );
 
-    # Key can be Visit, Entity_ID or none depending on the command (i.e. search/compare) run.
-    # For longitudinal datasources the search command computes statistics with respect to visit,
-    # hence the key is 'Visit'. Standard datasources are not visit based so no key is used.
-    # Compare command uses Entity_ID as the key when computing statistics for longitudinal datasources.
-    require Statistics::Descriptive;
+      # Key can be Visit, Entity_ID or none depending on the command (i.e. search/compare) run.
+      # For longitudinal datasources the search command computes statistics with respect to visit,
+      # hence the key is 'Visit'. Standard datasources are not visit based so no key is used.
+      # Compare command uses Entity_ID as the key when computing statistics for longitudinal datasources.
+      require Statistics::Descriptive;
 
-	for my $key (@keys) {
+      for my $key (@keys) {
 		push my @row, ( $key_index == 0 ? () : $key );
 		for my $col (@col) {
 			my $sdf = Statistics::Descriptive::Full->new();
@@ -550,7 +549,7 @@ sub _summary_stats {
 				  } keys %count;
 			}
 
-            # For all other variable types (e.g. date, datetime etc.) get no. of observations alone
+                        # For all other variable types (e.g. date, datetime etc.) get no. of observations alone
 			else {
 				push @row,
 				  sprintf( "N: %3s\n", scalar @{ $data->{$key}{$col} } );
@@ -571,6 +570,8 @@ sub _summary_stats {
 
 #------------- SUBCLASSES HOOKS -------------#
 
+sub usage_text { }
+
 sub get_query_parameters { }
 
 sub process_result_set { }
@@ -580,7 +581,7 @@ sub process_table { }
 sub get_stats_data { }
 
 END {
-
+        # Write saved commands to command history file
 	eval {
 		$COMMAND_HISTORY_CONFIG->save_file( $COMMAND_HISTORY_FILE,
 			$COMMAND_HISTORY );
@@ -622,18 +623,43 @@ Returns application option specifications as expected by L<Getopt::Long::Descrip
 
 =head2 validate( $opts, @args )
 
-This method validates the command options and arguments and throws exception upon validation failure.
+This method validates the command options and arguments and throws exceptions when validation fails.
 
 =head2 run( $opts, @args )
 
 This method is responsible for the overall functioning of the command. The method calls option specific methods for option specific processing.
 
+
+=head1 OPTION SPECIFIC PROCESSING
+
+=head2 process( $opts, $cache, @args )
+
+This method is always called first, irrespective of the options/arguments specified. The method attempts to query the database using the SQL constructed from the hash ref, returned from L<get_query_parameters|/get_query_parameters( $opts, $datasource, @args )>. Upon successful execution of the SQL query the method returns the output (i.e. C<$result_set>) which is a ref to array of arrays where each array corresponds to one row of entity data.
+
+=head2 save_command( $opts, $cache, @args)
+
+This method is only called if the user has specified the save command option (i.e. C<--save-command>). The method first constructs the command from command options and arguments (i.e. C<$opts> and C<@args>) and adds it to the C<$COMMAND_HISTORY> hash along with the datetime information. The C<$COMMAND_HISTORY> contains all commands previously saved by the user. 
+
+
+=head2 export_data( $opts, $cache, $result_set, $dir, $csv, @args )
+
+This method creates a output directory under the directory specified by the C<--out> option and calls the L<process_result_set|/process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args )> method of the subclass. The further processing by the method depends on the presence of C<--export> option(s). If the user has provided the C<--export> option, the method first constructs the SQL from L<entity_structure|CohortExplorer::Datasource/entity_structure()> with a table name placeholder. The method executes the same SQL with a different bind parameter (i.e. table name) depending upon the number of tables to be exported. The output obtained from successful execution of SQL is passed to L<process_table|/process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity )> for further processing.
+
+
+=head2 summary_stats( $opts, $cache, $result_set, $dir, $csv )
+
+This method is only called if the user has specified summary statistics (i.e. C<--stats>) option. The method computes the descriptive statistics from the data frame returned by L<get_stats_data|/get_stats_data( $result_set )>.
+
+
 =head1 SUBCLASS HOOKS
+
+=head2 usage_text()
+
+This method should return the usage information for the command.
 
 =head2 get_query_parameters( $opts, $datasource, @args )
 
-This method should return a hash ref with keys, C<static>, C<dynamic>, or C<both> depending on the datasource type and variables supplied in arguments and conditions. As a standard datasource has all static tables so the hash ref should only contain one key, C<static> where as a longitudinal datasource may contain both keys, C<static> and C<dynamic> provided the datasource has static tables.
-The parameters to the method are as follows:
+This method should return a hash ref with keys, C<static>, C<dynamic>, or C<both> depending on the datasource type and variables supplied in arguments and conditions. As a standard datasource has all static tables so the hash ref must contain only one key, C<static> where as a longitudinal datasource may contain both keys, C<static> and C<dynamic> provided the datasource has static tables. The parameters to the method are as follows:
 
 C<$opts> an options hash with the received command options as keys and their values as hash values.
 
@@ -643,16 +669,17 @@ C<@args> arguments to the command.
 
 =head2 process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args )
 
-This method should process the result set obtained after running the SQL query and write a csv file. If the variables provided as part of arguments and conditions belong only to the static tables, then the method should return a ref to list of entities present in the result set. Otherwise, the method should return a hash ref with entity_id as keys and corresponding visit numbers as values. 
-C<$opts> an options hash with the received command options as keys and their values as hash values.
+This method should process the result set obtained after running the SQL query and write a csv file. If the variables provided as part of arguments and conditions belong only to the static tables, the method should return a ref to list of entities present in the result set. Otherwise, the method should return a hash ref with C<Entity_ID> as keys and corresponding visit numbers as values. 
 
 In this method, 
+
+C<$opts> an options hash with the received command options as keys and their values as hash values.
 
 C<$datasource> is the datasource object.
 
 C<$result_set> is the output obtained upon SQL execution. 
 
-C<$dir> is the directory where results should be exported to.
+C<$dir> is the export directory.
 
 C<$csv> is the object of L<Text::CSV_XS>.
 
@@ -660,7 +687,7 @@ C<@args> arguments to the command.
 
 =head2 process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity )
 
-This method should process the table data returned after running the export SQL query. The method should write the table data in a csv file for all entities present in the result set.
+This method should process the table data obtained from running the export SQL query. The method should write the table data in a csv file for all entities present in the result set.
 
 The parameters to the method are:
 
@@ -670,19 +697,19 @@ C<$datasource> is the datasource object.
 
 C<$table_data> is the output obtained from executing the export SQL query.
 
-C<$dir> is the export directory specified by the user.
+C<$dir> is the export directory.
 
 C<$csv> is the object of L<Text::CSV_XS>.
 
-C<$result_entity> is a ref to all entities present in the result-set. If variabes present in C<cond> option and arguments belong to static tables the ref is simply to the list containing entity ids. Otherwise, the reference is to a hash where entity ids are keys and corresponding visit numbers are values.
+C<$result_entity> is a ref to all entities present in the result-set. If variables present in C<cond> option and C<@args> belong to static tables the ref is simply to the list containing C<Entity_IDs>. Otherwise, the reference is to a hash where C<Entity_IDs> are keys and corresponding visit numbers are values.
 
 =head2 get_stats_data( $result_set )
 
-This method should generate the data for computing summary statistics. The method should return a hash ref with key as the parameter, the statistics are computed with respect to and values as the hash with variable names as keys and array ref as values.
+This method should generate the data for computing summary statistics. The method should return a hash ref with key as the parameter, the statistics are computed with respect to and values as the hash with variable names as keys and array ref as hash values.
 
 =head1 DIAGNOSTICS
 
-CohortExplorer::Command::Query throws following exceptions imported from L<CLI::Framework::Exception>:
+CohortExplorer::Command::Query throws following exceptions imported from L<CLI::Framework::Exceptions>:
 
 =over
 
@@ -694,7 +721,7 @@ C<throw_cmd_run_exception>: This exception is thrown if one of the following con
 
 =item *
 
-The command history file fails to load. For the save command option to work it is required that the file C<$HOME/.CohortExplorer_History> exists with rwx enabled for CohortExplorer.
+The command history file fails to load. For the save command option to work it is required that the file C<$HOME/.CohortExplorer_History> exists with RWX enabled for CohortExplorer.
 
 =item *
 
@@ -741,6 +768,8 @@ L<Tie::IxHash>
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

@@ -112,7 +112,7 @@ This method returns the usage information for the command.
 
 =head2 validate( $opts, @args )
 
-This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exception> if
+This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exceptions> if
 
 =over
 
@@ -130,7 +130,7 @@ mutually exclusive options (i.e. show and clear) are specified together
 
 This method performs option specific processing.
 
-This class imports the variable C<$COMMAND_HISTORY> from L<CohortExplorer::Command::Query> to load user's search history. The history command enables the user keep track of previously saved commands and use the information (i.e. options and arguments) to build new commands.
+This class imports the variable C<$COMMAND_HISTORY> from L<CohortExplorer::Command::Query> to load user's search history. The history command enables the user to keep track of previously saved commands and use the information (i.e. options and arguments) to build new commands.
 
 =head1 OPTIONS
 
@@ -157,6 +157,8 @@ L<Exception::Class::TryCatch>
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

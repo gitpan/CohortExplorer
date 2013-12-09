@@ -21,7 +21,7 @@ sub authenticate {
 
 	my @bind = ( $self->name(), $opts->{username}, $opts->{password} );
 
-    # Successful authentication outputs array_ref as response
+        # Successful authentication outputs array_ref as response
 	my $response = $self->dbh()->selectrow_arrayref( $stmt, undef, @bind );
 
 	return $response;
@@ -42,8 +42,8 @@ sub default_parameters {
 	( $default{static_tables}, $default{init_event_id} ) =
 	  $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
 
-    # If the data was collated across multiple events the datasource is longitudinal
-    # otherwise standard (i.e. non-longitudinal)
+        # If the data was collated across multiple events the datasource is longitudinal
+        # otherwise standard (i.e. non-longitudinal)
 	if ( $default{static_tables} ) {
 		$default{type} = 'longitudinal';
 		$default{static_tables} = [ split /,\s*/, $default{static_tables} ];
@@ -175,21 +175,17 @@ __END__
 
 CohortExplorer::Application::REDCap::Datasource - Class to initialise datasource stored under REDCap SQL framework ( see L<http://project-redcap.org/>)
 
-=head1 VERSION
-
-Version 0.01
-
 =head1 SYNOPSIS
 
-The class is inherited from L<CohortExplorer::Datasource> class and overrides the following methods:
+The class is inherited from L<CohortExplorer::Datasource> and overrides the following methods:
 
 =head2 authenticate( $opts )
 
-This method authenticates the user by running the authentication query against the redcap database. The successful authentication results in a array_ref containing C<project_id> and C<data_export_tool>. In order to use CohortExplorer the user must have the permission to export data in REDCap (i.e. data_export_tool != 0).
+This method authenticates the user by running the authentication query against the REDCap database. The successful authentication returns array ref containing C<project_id> and C<data_export_tool>. In order to use CohortExplorer the user must have the permission to export data in REDCap (i.e. C<data_export_tool != 0>).
 
 =head2 default_parameters( $opts, $response )
 
-This method adds project_id and data_export_tool to the datasource object as default parameters. Moreover, the method runs a query to check if the datasource is standard or longitudinal. If the datasource is longitudinal then, C<static_tables> and C<event_id (min)> are added as default parameters.
+This method adds C<project_id> and C<data_export_tool> to the datasource object as default parameters. Moreover, the method runs a SQL query to check if the datasource is standard or longitudinal. If the datasource is longitudinal then, C<static_tables> and C<event_id (min)> are added as default parameters.
 
 =head2 entity_structure()
 
@@ -210,6 +206,8 @@ This method returns variable type to SQL type mapping.
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

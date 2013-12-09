@@ -36,7 +36,7 @@ sub authenticate {
 		$response->content() =~
 /\{\"name\"\:\s*\"$datasource_name\",\"link\"\:\s*\"\/datasource\/$datasource_name\",\"table\":\s*\[([^\]]+)\],(\"view\":\s*\[([^\]]+)\])*/;
 		if ($1) {
-            # Successful authentication returns tables (excluding views) accessible to the user
+                        # Successful authentication returns tables (excluding views) accessible to the user
 			my %views;
 			my @tables = map { s/\"//g; $_ } split /,/, $1;
 			%views = map { s/\"//g; $_ => 1 } split /,/, $3 if ($3);
@@ -52,7 +52,7 @@ sub authenticate {
 	}
 
 	else {
-		die "Failed to connect to Opal server at $url (error $response_code)\n";
+		die "Failed to connect to Opal server via $url (error $response_code)\n";
 	}
 
 }
@@ -122,7 +122,7 @@ sub entity_structure {
 		}
 	);
 
-    # For longitudinal datasources split identifier into entity_id and visit using id_split_separator
+        # For longitudinal datasources split identifier into entity_id and visit using id_split_separator
 	if ( $self->type() eq 'longitudinal' ) {
 		my $id_visit_sep = $self->id_visit_separator();
 		$struct{-columns}{entity_id} =
@@ -172,8 +172,8 @@ sub variable_structure {
 
 	if ( $username ne "administrator" ) {
 
-        # For users other than the administrator only variables with permission TABLE_ALL, TABLE_VALUES,
-        # ADMINISTRATE and VIEW_ALL are retrieved
+                # For users other than the administrator only variables with permission TABLE_ALL, TABLE_VALUES,
+                # ADMINISTRATE and VIEW_ALL are retrieved
 		$acl{-or} = [
 			"vt.name" => {
 				-in => \
@@ -240,17 +240,13 @@ __END__
 
 CohortExplorer::Application::Opal::Datasource - Class to initialise datasource stored under Opal SQL framework ( see L<http://obiba.org/node/63>)
 
-=head1 VERSION
-
-Version 0.01
-
 =head1 SYNOPSIS
 
-The class is inherited from L<CohortExplorer::Datasource> class and overrides the following methods:
+The class is inherited from L<CohortExplorer::Datasource> and overrides the following methods:
 
 =head2 authenticate( $opts )
 
-This method authenticates the user using the REST URL specified in datasource-config.properties. By default, the REST URL is http://localhost:8080. The successful authentication results in the tables (excluding views) accessible to the user.
+This method authenticates the user using the REST URL specified in C</etc/CohortExplorer/datasource-config.properties>. By default, the REST URL is C<http://localhost:8080>. The successful authentication results in the tables (excluding views) accessible to the user.
 
 =head2 default_parameters( $opts, $response )
 
@@ -262,7 +258,7 @@ This method returns a hash ref containing all default parameters. By default,
 
 =head2 entity_structure()
 
-This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the entity_id and visit number on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The id_visit_separator can also be a string (e.g., PARTIOP1, PARTIOP2).
+This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the entity_id and visit number on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The id_visit_separator can also be a string (e.g. PARTIOP1, PARTIOP2).
 
 =head2 table_structure()
 
@@ -285,6 +281,8 @@ L<MIME::Base64>
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

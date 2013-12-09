@@ -11,7 +11,7 @@ our $VERSION = 0.01;
 sub usage_text {
 
        q{
-              help [command]: usage information for an individual command or the application itself
+              help [command]: application or command specific usage
         };
 }
 
@@ -42,9 +42,9 @@ sub run {
 			&& !$app->is_interactive_command($command_name) );
 	}
 
-    # Commands search and compare can be invalid as they are application dependent (i.e. depend on
-    # availability of variables and datasource type) where as, menu and console commands are invalid only
-    # when the application is running in interactive mode
+        # Commands search and compare can be invalid as they are application dependent (i.e. depend on
+        # availability of variables and datasource type) where as, menu and console commands are invalid only
+        # when the application is running in interactive mode
 
 	# The application usage should only contain information on valid commands
 	my $application_usage = $app->usage();
@@ -75,6 +75,18 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Help - CLIF (see L<CLI::Framework::Command::Help>) built-in command to print application or command-specific usage messages. Only a small modification has been made to L<CLI::Framework::Command::Help> so that the application usage discards all sections appertaining to the invalid commands.
+CLI::Framework::Command::Help - CohortExplorer command to show application or command specific usage
+
+=head1 DESCRIPTION
+
+This class is inherited from L<CLI::Framework::Command::Help> and overrides the methods below:
+
+=head2 usage_text()
+
+This method returns the usage information for the help command.
+
+=head2 run( $opts, @args )
+
+The method returns application or command specific usage. Only a small modification has been made to the original code so that the application usage only includes the usage information on valid commands.
 
 =cut

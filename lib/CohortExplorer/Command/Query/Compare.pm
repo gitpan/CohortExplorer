@@ -6,6 +6,7 @@ use warnings;
 our $VERSION = 0.01;
 
 use base qw(CohortExplorer::Command::Query);
+use CLI::Framework::Exceptions qw( :all );
 
 #-------
 
@@ -28,8 +29,8 @@ sub usage_text {    # Command is only available to longitudinal datasources
                    Conditions can be used using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in 
                    and regexp.
 
-                   When a condition is imposed on a regular variable (i.e. not visit) from dynamic tables then it is assumed that the
-                   condition applies to all visits of that variable.
+                   When a condition is imposed on regular variables (i.e. not visit) from dynamic tables then it is assumed that the
+                   condition applies to all visits of those variables.
 
 
                 EXAMPLES
@@ -54,7 +55,7 @@ sub get_query_parameters {
 	my $struct        = $datasource->entity_structure();
 	my %param;
 
-    # Extract all variables from args/cond (option) except Entity_ID and Visit as they are dealt separately
+        # Extract all variables from args/cond (option) except Entity_ID and Visit as they are dealt separately
 	my @vars = grep( !/^Entity_ID|Visit$/,
 		keys %{
 			{
@@ -100,19 +101,17 @@ sub get_query_parameters {
 
 		else {
 
-	        # Build conditions for visit variables e.g. V1.Var, Vlast.Var, Vany.Var etc.
-	        # Values inside array references are joined as 'OR' and hashes as 'AND'
+	                # Build conditions for visit variables e.g. V1.Var, Vlast.Var, Vany.Var etc.
+	                # Values inside array references are joined as 'OR' and hashes as 'AND'
 			my @visit_vars = grep( /^(V(any|last|[0-9]+)\.$var|$var)$/,
 				keys %{ $opts->{cond} } );
 
 			for my $visit_var ( sort @visit_vars ) {
 
-                # Last visits (i.e. Vlast) for entities are not known in advance so practically any
-                # visit can be the last visit for any entity
+                                # Last visits (i.e. Vlast) for entities are not known in advance so practically any
+                                # visit can be the last visit for any entity
 				if ( $visit_var =~ /^Vlast\.$var$/ ) {
-					my ( $opr, $val ) =
-					  ( $opts->{cond}{"Vlast.$var"} =~
-						  /^\{\'([^\']+)\',(.+)\}$/ );
+					my ( $opr, $val ) = ( $opts->{cond}{"Vlast.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
 					$val = !$2 ? undef : eval $2;
 
 					if ( defined $param{$table_type}{-having}{-or} ) {
@@ -136,9 +135,7 @@ sub get_query_parameters {
 
 				# Vany includes all visit variables joined as 'OR'
 				elsif ( $visit_var =~ /^Vany\.$var$/ ) {
-					my ( $opr, $val ) =
-					  ( $opts->{cond}{"Vany.$var"} =~
-						  /^\{\'([^\']+)\',(.+)\}$/ );
+					my ( $opr, $val ) = ( $opts->{cond}{"Vany.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
 					$val = !$2 ? undef : eval $2;
 
 					if ( defined $param{$table_type}{-having}{-and} ) {
@@ -173,8 +170,8 @@ sub get_query_parameters {
 					}
 				}
 
-                # When a condition is imposed on a variable (with no prefix V1, Vlast, Vany) from dynamic table(s) then
-                # it is assumed that the condition applies to all visits of that variable (i.e. 'AND' case)
+                                # When a condition is imposed on a variable (with no prefix V1, Vlast, Vany) from dynamic table(s) then
+                                # it is assumed that the condition applies to all visits of that variable (i.e. 'AND' case)
 				else {
 
 					map {
@@ -197,7 +194,7 @@ sub get_query_parameters {
 
 		else {
 
-		    # Entity_ID and Visit are added to the list of SQL cols in dynamic param
+		        # Entity_ID and Visit are added to the list of SQL cols in dynamic param
 			unshift @{ $param{$_}{-columns} },
 			  (
 				$struct->{-columns}{entity_id} . '|`Entity_ID`',
@@ -234,14 +231,15 @@ sub get_query_parameters {
 	return \%param;
 }
 
+
 sub process_result_set {
 
 	my ( $self, $opts, $datasource, $result_set, $dir, $csv, @args ) = @_;
 
-    # Header of the csv output must pay attention to args and variables on which the condition is imposed
-    # Extract visit specific variables from the result-set based on the variables provided as args/cond (option).
-    # For example, variables in args/cond variables are V1.Var and Vlast.Var but as the result-set contains all visits of
-    # the variable 'var' so discard V2.var and V3.var and select V1.var and the equivalent Vlast.Var
+        # Header of the csv output must pay attention to args and variables on which the condition is imposed
+        # Extract visit specific variables from the result-set based on the variables provided as args/cond (option).
+        # For example, variables in args/cond variables are V1.Var and Vlast.Var but as the result-set contains all visits of
+        # the variable 'var' so discard V2.var and V3.var and select V1.var and the equivalent Vlast.Var
 	my $index = $result_set->[0][3] && $result_set->[0][3] eq 'Visit' ? 3 : 0;
 
 	# Compiling regex to extract variables specified as args/cond (option)
@@ -249,19 +247,18 @@ sub process_result_set {
 
 	$regex = qr/$regex/;
 
-	my @index_to_use = sort { $a <=> $b } keys %{
+	my @index_to_use = sort { $a <=> $b } keys % {
 		{
 			map { $_ => 1 } (
-				0 .. $index,
-				grep( $result_set->[0][$_] =~ $regex,
-					0 .. $#{ $result_set->[0] } )
-			)
+				          0 .. $index,
+				          grep( $result_set->[0][$_] =~ $regex, 0 .. $#{ $result_set->[0] } )
+			                )
 		}
 	  };
 
 	my @vars = @{ $result_set->[0] }[@index_to_use];
 
-    # Extract last visit specific variables (i.e. Vlast.Var) in args/cond (option)
+        # Extract last visit specific variables (i.e. Vlast.Var) in args/cond (option)
 	my @last_visit_vars =
 	  grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) );
 
@@ -302,10 +299,10 @@ sub process_result_set {
 	return \@result_entity;
 }
 
+
 sub process_table {
 
-	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) =
-	  @_;
+	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) = @_;
 
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $table_type =
@@ -361,13 +358,14 @@ sub process_table {
 	$fh->close();
 }
 
+
 sub get_stats_data {
 
 	my ( $self, $result_set ) = @_;
 	my $index = $result_set->[0][3] && $result_set->[0][3] eq 'Visit' ? 3 : 0;
 	my %data;
 
-    # Remove visit suffix Vany, Vlast, V1, V2 etc. from the variables in the result-set (i.e. args/cond (option))
+        # Remove visit suffix Vany, Vlast, V1, V2 etc. from the variables in the result-set (i.e. args/cond (option))
 	my @vars = keys %{
 		{
 			map { s/^V(any|last|[0-9]+)\.//; $_ => 1 }
@@ -380,9 +378,7 @@ sub get_stats_data {
 		for my $var (@vars) {
 			$data{ $result_set->[$row][0] }{$var} = [
 				map {
-					    $result_set->[0][$_] =~ /$var$/
-					  ? $result_set->[$row][$_] || ()
-					  : ()
+				       $result_set->[0][$_] =~ /$var$/ ? $result_set->[$row][$_] || () : ()
 				  } $index + 1 .. $#{ $result_set->[0] }
 			];
 			$data{ $result_set->[$row][0] }{'Visit'} =
@@ -418,21 +414,25 @@ The compare command enables the user to compare entities across visits. The user
 
 This class is inherited from L<CohortExplorer::Command::Query> and overrides the following methods:
 
+=head2 usage_text()
+
+This method returns the usage information for the command.
+
 =head2 get_query_parameters( $opts, $datasource, @args )
 
 This method returns a hash ref with keys, C<static>, C<dynamic> or C<both> depending on the variables supplied within arguments and conditions. The value of each key is a hash containing SQL parameters, C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
 
 =head2 process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args )
      
-This method writes result set to csv file and return a ref to a list containing entity_ids.
+This method writes result set to csv file and return a ref to the list containing C<Entity_IDs>.
         
 =head2 process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity )
         
-This method writes the table data into a csv file for entities present in the result set. For static tables the csv contains C<Entity_ID> followed by variables' values and in case of dynamic tables the csv contains C<Entity_ID> followed by values of all visit variables.
+This method writes the table data into a csv file for entities present in the result set. For static tables the csv contains C<Entity_ID> followed by variables' values and in case of dynamic tables the csv contains C<Entity_ID> followed by the values of all visit variables.
 
 =head2 get_stats_data( $result_set )
 
-This method returns a hash ref with entity_id as keys and variable-value hash as its value. The statistics in this command are computed with respect to the entity_id and number of observation for each variable is equal to the number of times/visits each variable was recorded.
+This method returns a hash ref with C<Entity_ID> as keys and variable-value pairs as its value. The statistics in this command are computed with respect to the C<Entity_ID> and number of observation for each variable is equal to the number of times/visits each variable was recorded.
  
 =head1 OPTIONS
 
@@ -460,31 +460,33 @@ Show statistics
 
 =item B<-c> I<COND>, B<--cond>=I<COND>
             
-Impose conditions using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in and regexp.
+Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<gt>=>, C<E<lt>>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in> and C<regexp>.
 
 =back
 
 =head1 NOTES
 
-The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as arguments as they are already part of the query-set. However, the user has the liberty to impose conditions on both the C<Entity_ID> and C<Visit>, using the condition option. Other variables in arguments and conditions must be referenced as C<Table.Variable> or C<Visit.Table.Variable> where Visit = Vlast, Vany, V1, V2, etc. When a condition is imposed on variable(s) (i.e. with no prefix V1, V2, Vany or Vlast) from dynamic table(s) then it is assumed that the condition applies to all visits of the variable(s). The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
+The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as arguments as they are already part of the query-set. However, the user has the liberty to impose conditions on both the C<Entity_ID> and C<Visit>, using the C<cond> option. Other variables in arguments and conditions must be referenced as C<Table.Variable> or C<Visit.Table.Variable> where Visit = C<V1>, C<V2>, C<Vany>, C<Vlast> etc. When a condition is imposed on variables with no prefix C<V1>, C<V2>, C<Vany> or C<Vlast>, it is assumed that the condition applies to all visits of those variables. The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
 
 =head1 EXAMPLES
 
-compare --out=/home/user/exports --stats --save-search --cond=V1.CER.Score="{'>','20'}" --cond=Vlast.CER.Score="{'<=','30'}" V1.SC.Date
+ compare --out=/home/user/exports --stats --save-search --cond=V1.CER.Score="{'>','20'}" --cond=Vlast.CER.Score="{'<=','30'}" V1.SC.Date
 
-compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V1.DIS.Status
+ compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V1.DIS.Status
 
-compare -o'/home/user/exports' -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
+ compare -o'/home/user/exports' -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
 
-compare -o'/home/user/exports' -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
+ compare -o'/home/user/exports' -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
 
 =head1 DIAGNOSTICS
 
-This class throws C<throw_cmd_run_exception> exception imported from L<CLI::Framework::Exception> if L<Text::CSV_XS> fails to construct a csv string from list containing variables' values.
+This class throws C<throw_cmd_run_exception> exception imported from L<CLI::Framework::Exceptions> if L<Text::CSV_XS> fails to construct a csv string from the list containing variables' values.
 
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

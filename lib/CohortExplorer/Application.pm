@@ -3,10 +3,16 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 # Directory list for command-line completion
 my @DIRS;
+
+# Path to log configuration file
+my $LOG_CONFIG_FILE = "/etc/CohortExplorer/log-config.properties";
+
+# Path to datasource configuration file
+my $DATASOURCE_CONFIG_FILE = "/etc/CohortExplorer/datasource-config.properties";
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -47,8 +53,8 @@ sub usage_text {
 
 sub option_spec {
 
-	# Username, password and datasource name are mandatory options
-	# Password may or may not be provided at start
+	  # Username, password and datasource name are mandatory options
+	  # Password may or may not be provided at start
 	  [],
 	  [ 'datasource|d:s' => 'provide datasource' ],
 	  [ 'username|u:s'   => 'provide username' ],
@@ -66,12 +72,12 @@ sub validate_options {
 
 	# Show help and exit ...
 	if ( $opts->{help} ) {
-		$app->render( $app->get_default_usage() );
-		exit;
+	     $app->render( $app->get_default_usage() );
+	     exit;
 	}
 
 	else {
-		if (   !$opts->{datasource}
+		if (       !$opts->{datasource}
 			|| !$opts->{username}
 			|| !exists $opts->{password} )
 		{
@@ -204,9 +210,9 @@ sub pre_dispatch {
 
 	my $cache = $app->cache->get('cache');
 
-   # Search, compare and history commands are application dependent as they,
-   # require the user to have access to at least one variable from table(s) and,
-   # depend on the datasource type
+        # Search, compare and history commands are application dependent as they,
+        # require the user to have access to at least one variable from table(s) and,
+        # depend on the datasource type
 	my @invalid_commands =
 	  grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
 
@@ -331,15 +337,29 @@ sub init {
 	require Log::Log4perl;
 
 	# Initialise logger
-	eval { Log::Log4perl::init( $app->log_config_file() ); };
+	eval { Log::Log4perl::init( $LOG_CONFIG_FILE ); };
 
 	if ( catch my $e ) {
-		throw_app_init_exception( error => $e );
+	     throw_app_init_exception( error => $e );
 	}
 
 	my $logger = Log::Log4perl->get_logger();
 
-	$opts->{password} = $app->password_prompt() if ( $opts->{password} eq '' );
+        # Prompt for password, if not provided at command line
+	unless ( $opts->{password} ) {
+                 $app->render("Enter password: ");
+                 ReadMode 'noecho';
+                 $opts->{password} = ReadLine(10);
+                 ReadMode 'normal';
+                 $app->render("\n");
+             
+                 unless ( $opts->{password} ) {
+                          $app->render("timeout\n");
+	                  exit;
+                 }
+        }      
+        
+        chomp $opts->{password};
 
 	# Initialise the datasource and store in cache for further use
 	$app->cache->set(
@@ -347,9 +367,7 @@ sub init {
 			verbose    => $opts->{verbose},
 			user       => $opts->{username} . '@' . $opts->{datasource},
 			logger     => $logger,
-			datasource => CohortExplorer::Datasource->initialise(
-				$opts, $app->datasource_config_file()
-			)
+			datasource => CohortExplorer::Datasource->initialise( $opts, $DATASOURCE_CONFIG_FILE )
 		}
 	);
 
@@ -357,7 +375,27 @@ sub init {
 
 		# No autocompletion if search is not a valid command
 		if ( !grep( $_ eq 'search', $app->noninteractive_commands() ) ) {
-			$app->find_sub_directories();
+		      
+                      # Get all directories under /root if the user is root, otherwise under $HOME
+	              no warnings 'File::Find';
+
+	              my $username = getlogin() || getpwuid($<) || $ENV{LOGNAME} || $ENV{USER};
+                      eval {
+		               find(
+			              {
+				        wanted => sub {
+					                push @DIRS, $_ if ( -d );
+				                      },
+				                      untaint  => 1,
+				                      no_chdir => 1
+			              },
+			              $username eq 'root' ? '/root' : '/home/' . $username
+		                   );
+	                };
+
+	                if ( catch my $e ) {
+		             throw_app_init_exception( error => $e );
+                        }
 		}
 		$app->render(
 			"Welcome to the CohortExplorer version $VERSION console." . "\n\n"
@@ -370,64 +408,6 @@ sub init {
 	return;
 }
 
-sub password_prompt {
-
-    my ($app) = @_;
-
-    $app->render("Enter password: ");
-    ReadMode 'noecho';
-    my $password = ReadLine(10);
-    ReadMode 'normal';
-    $app->render("\n");
-    unless ($password) {
-		$app->render("timeout\n");
-		exit;
-    }
-
-    chomp $password;
-    return $password;
-}
-
-sub find_sub_directories {
-
-	my ($app) = @_;
-
-	# Get all directories under /home/user for command-line completion
-	no warnings 'File::Find';
-	eval {
-		find(
-			{
-				wanted => sub {
-					push @DIRS, $_ if ( -d );
-				},
-				untaint  => 1,
-				no_chdir => 1
-			},
-			$app->export_directory()
-		);
-	};
-
-	if ( catch my $e ) {
-		throw_app_init_exception( error => $e );
-
-	}
-}
-
-sub log_config_file {
-
-	return '/etc/CohortExplorer/log-config.properties';
-}
-
-sub datasource_config_file {
-
-	return '/etc/CohortExplorer/datasource-config.properties';
-
-}
-
-sub export_directory {
-
-	return '/home/' . getlogin();
-}
 
 #-------
 1;
@@ -439,10 +419,6 @@ __END__
 =head1 NAME
 
 CohortExplorer::Application - CohortExplorer superclass
-
-=head1 VERSION
-
-Version 0.01
 
 =head1 SYNOPSIS
 
@@ -466,20 +442,20 @@ This method returns the application option specifications as expected by L<Getop
 
 =head2 validate_options( $opts )
 
-This method ensures the user has supplied all mandatory options (i.e., datasource, username and password).
+This method ensures the user has supplied all mandatory options (i.e. datasource, username and password).
 
 =head2 command_map()
 
 This method returns the mapping between command names and command classes
  
   console  => 'CLI::Framework::Command::Console',
-  help     => 'CohortExplorer::Application::Command::Help',
-  menu     => 'CohortExplorer::Application::Command::Menu',
-  describe => 'CohortExplorer::Application::Command::Describe',
-  history  => 'CohortExplorer::Application::Command::History',
-  find     => 'CohortExplorer::Application::Command::Find',
-  search   => 'CohortExplorer::Application::Command::Query::Search',
-  compare  => 'CohortExplorer::Application::Command::Query::Compare'
+  help     => 'CohortExplorer::Command::Help',
+  menu     => 'CohortExplorer::Command::Menu',
+  describe => 'CohortExplorer::Command::Describe',
+  history  => 'CohortExplorer::Command::History',
+  find     => 'CohortExplorer::Command::Find',
+  search   => 'CohortExplorer::Command::Query::Search',
+  compare  => 'CohortExplorer::Command::Query::Compare'
 
 =head2 command_alias()
 
@@ -500,7 +476,7 @@ This method ensures the invalid commands do not dispatch and logs the commands d
 
 =head2 noninteractive_commands()
 
-The method returns a list of the valid commands under interactive mode. The commands search, compare and history can be invalid as they are application dependent because they require the user to have access to at least one variable from the datasource and also depend on the datasource type (e.g., compare command is only available to longitudinal datasources).
+The method returns a list of the valid commands under interactive mode. The commands search, compare and history can be invalid as they are application dependent because they require the user to have access to at least one variable from the datasource and also depend on the datasource type.
  
 =head2 render( $output )
 
@@ -516,61 +492,40 @@ This method prints and logs all exceptions.
  
 =head2 init( $opts )
 
-This method is responsible for the initialising of the application which includes initialising the logger and the datasource object. 
+This method is responsible for the initialising of the application which includes initialising the logger and the datasource
+object. 
 
 =head2 OPERATIONS
 
-This class attempts to perform the following operations:
+This class attempts to perform the following operations upon successful initialisation of the datasource:
 
 =over
 
 =item 1
 
-Initialises the application logger. The logger's configuration is read from the file specified under L<log_config_file|/log_config_file()>.
+Prints a menu of available command based on the datasource type. For standard (i.e. non-longitudinal) datasource the command menu includes describe, find, search, history and help where as, the longitudinal datasources have also access to the compare command. The search, compare and history commands require the user to have access to at least one variable from the datasource. Steps 1 and 2 are skipped when the application is running in command-line mode.
 
 =item 2
 
-Captures the application options and passes them along with the datasource configuration file specified under L<datasource_config_file|/datasource_config_file()> to the datasource class for object intialisation.
+Provides autocompletion of command arguments/options (if applicable) for the user entered command.
 
 =item 3
 
-Stores the resulting datasource object in the cache along with the logger object to be used by the commands.
+Dispatches the command object for command specific processing.
 
-=item 4
+=item 4 
 
-Creates a menu of available command based on the datasource type. For standard (i.e. non-longitudinal) datasource the command menu includes describe, find, search, history and help where as, the longitudinal datasources have also access to the compare command. The search, compare and history commands require the user to have access to at least one variable from the datasource.
+Logs exceptions (if any) thrown by the commands.
 
 =item 5
 
-Provides autocompletion of command arguments/options (if applicable) for the user entered command. This feature is only available when the application is running in the console/interactive mode.
-
-=item 6
-
-Dispatches the command object for command specific processing.
-
-=item 7
-
-Captures the output returned by a command and displays them as a table.
-
-=item 8 
-
-Logs all exceptions thrown by the commands. 
+In case of no exceptions, it captures the output returned by the commands and displays them in a table.
 
 =back
 
-=head1 SUBCLASS HOOK
-
-=head2 log_config_file()
-
-Returns the full path to the log configuration file (default /etc/CohortExplorer/log-config.properties). The logger is implemented using L<Log::Log4perl>. The logger attempts to log both the error and information messages.
-
-=head2 datasource_config_file()
-
-Returns the full path to the datasource configuration file (default /etc/CohortExplorer/datasource-config.properties). To see how the datasources can be configured using the config file see L<CohortExplorer::Datasource>.
-
 =head1 ERROR HANDLING
 
-All exceptions thrown within CohortExplorer are treated by the C<handle_exception( $e )> method. The exceptions are imported from L<CLI::Framework::Exception>.
+All exceptions thrown within CohortExplorer are treated by the C<handle_exception( $e )> method. The exceptions are imported from L<CLI::Framework::Exceptions>.
  
 =head1 DEPENDENCIES
 
@@ -592,9 +547,11 @@ L<Text::ASCIITable>
 
 L<CohortExplorer>
 
+L<CohortExplorer::Datasource>
+
 L<CohortExplorer::Command::Describe>
 
-L<CohortExplorer::Command::History>
+L<CohortExplorer::Command::Find>
 
 L<CohortExplorer::Command::Query::Search>
 

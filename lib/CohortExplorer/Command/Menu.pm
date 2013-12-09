@@ -41,6 +41,14 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Menu - CLIF (see L<CLI::Framework::Command::Menu>) built-in command to show a command menu including the commands that are available to the running application. Only a small modification has been made to L<CLI::Framework::Command::Menu> so that the menu command only shows the valid and visible commands with aliases.
+CohortExplorer::Command::Menu - CohortExplorer command to show a command menu
+
+=head1 DESCRIPTION
+
+This class is inherited from L<CLI::Framework::Command::Menu> and overrides the C<menu_txt()> method.
+
+=head2 menu_txt()
+
+This method creates a command menu including the commands that are available to the running application. Only a small modification has been made to the original code so that the menu includes command aliases along with the command names.
 
 =cut

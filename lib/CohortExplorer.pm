@@ -7,11 +7,11 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use CohortExplorer::Application;
-my $app = CohortExplorer::Application->new();
-$app->run();
+
+CohortExplorer::Application->run();
 
 #-------
 
@@ -23,17 +23,13 @@ __END__
 
 CohortExplorer - Explore clinical cohorts and search for entities and variables of interest
 
-=head1 VERSION
-
-Version 0.01
-
 =head1 SYNOPSIS
 
 B<CohortExplorer [OPTIONS] COMMAND [COMMAND-OPTIONS]>
 
 =head1 DESCRIPTION
 
-CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the entity-attribute-value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, Labkey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the datasource API (L<CohortExplorer::Datasource>). CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
+CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the datasource API (L<CohortExplorer::Datasource>). CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
 
 The application makes use of the following concepts to explore clinical repositories within the EAV framework:
 
@@ -71,7 +67,7 @@ Questionnaires in a datasource, which are used frequently to collate the entity 
 
 =head1 MOTIVATION
 
-I have not found any query tools that can standardise the EAV schema. All available clinical data capture and management software come with their own EAV schema. This poses a problem when two or more research groups collaborate on a project and the collaboration involves data exchange in the form of database dump (anonymised). The research groups may have used a different EAV to store their clinical data. CohortExplorer is an attempt to standardise the entity-value schema so any clinical respository can be plugged into it thus, enabling the users to browse the datasources using a standard command line search interface.
+I have not found any query tools that can standardise the EAV schema. All available clinical data capture and management software have their own EAV schema. This poses a problem when two or more research groups collaborate on a project and the collaboration involves data exchange in the form of database dump (anonymised). The research groups may have used a different EAV to store their clinical data. CohortExplorer is an attempt to standardise the entity attribute value model so any clinical respository can be plugged into it thus, enabling the users to browse the datasources using a standard command line search interface.
 
 In addition, our group's specific query requirements also motivated me to write CohortExplorer.
        
@@ -97,7 +93,7 @@ Command-line completion for options and arguments wherever applicable.
         
 =item 5
 
-Entities can be searched with/without imposing conditions on variables using the appropriate commands.
+Entities can be searched with/without imposing conditions on the variables.
         
 =item 6 
 
@@ -113,7 +109,7 @@ Allows the user to view summary statistics and export the data on tables in csv 
 
 =item 9
 
-Allows the user to query for variables and view their corresponding dictionary (i.e., meta data).
+Allows the user to query for variables and view their corresponding dictionary (i.e. meta data).
         
 =back
 
@@ -151,34 +147,33 @@ B<Note> that the username and password is the same as the parent clinical reposi
 
 =item B<describe>
 
-This command outputs the datasource description in a tabular format where the first column is the table name followed by the table attributes (e.g., variable_count, label etc.). The command also displays entity (count) for the specified datasource. For more on this command see L<CohortExplorer::Application::Command::Describe>.
+This command outputs the datasource description in a tabular format where the first column is the table name followed by the table attributes (e.g., variable_count, label etc.). The command also displays entity (count) for the specified datasource. For more on this command see L<CohortExplorer::Command::Describe>.
       
 =item B<find>
       
-This command enables the user to find variables by supplying keywords. The command outputs the dictionary of resulting variables. The dictionary can include, variable name, table name, unit, categories (if any) and the associated label. For more on this command see L<CohortExplorer::Application::Command::Find>.
+This command enables the user to find variables by supplying keywords. The command outputs the dictionary of variables that are found. The dictionary can include, variable name, table name, unit, categories (if any) and the associated label. For more on this command see L<CohortExplorer::Command::Find>.
       
 =item B<search>
 
-This command enables the user to search for entities by supplying the variables of interest. The user also has the liberty to impose conditions on the variables. For more on this command see L<CohortExplorer::Application::Command::Query::Search>.
+This command enables the user to search for entities by supplying the variables of interest. The user has the liberty to impose conditions on the variables. For more on this command see L<CohortExplorer::Command::Query::Search>.
       
 =item B<compare>
 
-This command enables the user to compare entities across visits by supplying the variables of interest. The command is only available to the longitudinal datasources.  For more on this command see L<CohortExplorer::Application::Command::Query::Compare>. 
+This command enables the user to compare entities across visits by supplying the variables of interest. The command is only available to the longitudinal datasources.  For more on this command see L<CohortExplorer::Command::Query::Compare>. 
       
 =item B<history>
 
-This command enables the user to see the history of saved commands. The user can utilise the existing information (like options and arguments) to build new commands without writing the commands again. For more on this command see
-L<CohortExplorer::Application::Command::History>.
+This command enables the user to see the history of saved commands. The user can utilise the existing information (like options and arguments) to build new commands without writing the commands again. For more on this command see L<CohortExplorer::Command::History>.
       
 =back
 
 =head1 EXAMPLES
 
-       [somebody@somewhere]$ CohortExplorer --datasource=Clinical --username=administrator --password describe (run describe command)
+ [somebody@somewhere]$ CohortExplorer --datasource=Clinical --username=administrator --password describe (run describe command)
 
-       [somebody@somewhere]$ CohortExplorer --verbose --datasource=Clinical --username=administrator --password console (start console)
-
-       [somebody@somewhere]$ CohortExplorer -v -dClinical -uguest -p f -fi cancer diabetes (run find command in verbose mode with aliases and bundling)
+ [somebody@somewhere]$ CohortExplorer -v -dClinical -uadministrator -p console (start console in verbose mode)
+   
+ [somebody@somewhere]$ CohortExplorer -dClinical -uguest -p f -fi cancer diabetes (run find command with aliases)
 
 =head1 BUGS
 
@@ -204,7 +199,11 @@ L<Text::ASCIITable>
 
 L<CohortExplorer>
 
+L<CohortExplorer::Datasource>
+
 L<CohortExplorer::Command::Describe>
+
+L<CohortExplorer::Command::Find>
 
 L<CohortExplorer::Command::History>
 

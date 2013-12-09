@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use Carp;
 use Config::General;
@@ -33,7 +33,7 @@ sub initialise {
 	};
 
 	if ( catch my $e ) {
-		throw_app_init_exception( error => $e );
+	      throw_app_init_exception( error => $e );
 	}
 
 	throw_app_init_exception(
@@ -60,15 +60,13 @@ sub initialise {
 	};
 
 	if ( catch my $e ) {
-		throw_app_init_exception( error => $e );
+	     throw_app_init_exception( error => $e );
 	}
 
 	for (qw(dsn username password)) {
-               # Remove DSN, username and password
-		 delete $param->{$_};
+             # Remove DSN, username and password
+             delete $param->{$_};
 	}
-
-	require SQL::Abstract::More;
 
 	# Add sqla object
 	$param->{sqla} = SQL::Abstract::More->new(
@@ -132,7 +130,7 @@ sub _process {
 		}
 
 		throw_app_hook_exception( error =>
-            "'-columns' in method '$method' of class '$class' is not hash worthy"
+                      "'-columns' in method '$method' of class '$class' is not hash worthy"
 		) unless ref $struct->{-columns} eq 'HASH';
 
 		# Set entity params (i.e. entity_count, visit_max), tables and variables
@@ -140,8 +138,7 @@ sub _process {
 		$datasource->$method($struct);
 	}
 
-	$datasource->set_visit_variables($opts)
-	  if ( $datasource_type eq 'longitudinal' );
+	$datasource->set_visit_variables() if ( $datasource_type eq 'longitudinal' );
 
 }
 
@@ -169,7 +166,7 @@ sub set_entity_parameters {
 		}
 		else {
 			throw_app_hook_exception( error =>
-               "Missing column '$_' in method 'entity_structure' of class '$class' "
+                         "Missing column '$_' in method 'entity_structure' of class '$class' "
 			);
 		}
 	}
@@ -314,10 +311,10 @@ sub set_variable_parameters {
 			  "Undefined table/variable found in datasource $datasource_name" )
 		  if ( !$row->{table} || !$row->{variable} );
 
-       # Variables are referenced as Table.Variable
-       # $datasource->{variables} contains only two attributes (i.e. category and type) as
-       # only these are used in search/compare commands.
-       # Find command involves use of all variable attributes.
+                # Variables are referenced as 'Table.Variable'
+                # $datasource->{variables} contains only two attributes (i.e. category and type) as
+                # only these are used in search/compare commands.
+                # Find command involves use of all variable attributes.
 		$datasource->{variables}{ $row->{table} . '.' . $row->{variable} } = {
 			'category' => $row->{category} || undef,
 
@@ -332,9 +329,9 @@ sub new {
 	return bless $_[1], $_[0];
 }
 
-sub set_visit_variables {
+sub _set_visit_variables {
 
-	my ( $datasource, $opts ) = @_;
+	my ( $datasource ) = @_;
 
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $visit_max = $datasource->visit_max();
@@ -415,9 +412,8 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
         
          my ($self, $opts, $response) = @_;
           
-         
-         # get database handle (i.e., $self->dbh()) and run some SQL queries to get additional parameters
-         # or, simply add some more parameters without querying the database
+         # get database handle (i.e. $self->dbh()) and run some SQL queries to get additional parameters
+         # or, simply add some parameters without querying the database
          
          return $default;
     }
@@ -498,10 +494,11 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
       };
     }
     
+=head1 OBJECT CONSTRUCTION
 
-=head1 CONCEPTS
+=head2 initialise( $opts, $config_file )
 
-CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (default /etc/CohortExplorer/datasource-config.properties) to instantiate the datasource object. The config file takes the format below,
+CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C</etc/CohortExplorer/datasource-config.properties>) to instantiate the datasource object. The config file takes the format below,
 
         <datasource Clinical> 
          namespace=Opal
@@ -531,47 +528,53 @@ CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factor
          password=yourpassword
        </datasource>
 
-Each blocks holds a unique datasource configuration. Apart from some reserved parameters, C<namespace>, C<dsn>, C<username> and C<password> it is up to the user to decide what parameters they want to include in the configuration file. The user can specify the actual name of the datasource using the C<name> parameter provided the block name is an alias. If the C<name> parameter is not found then the block name is assumed to be the actual name of the datasource. In the example above, both Clinical and Clinical1 connect to the same datasource (i.e. Clinical) but with different configurations. Once CohortExplorer::Datasource has successfully instantiated the datasource object the user can access the parameters by simply calling the methods which have the same name as the parameters. For example, the database handle can be retrieved by C<$self-E<gt>dbh()> and id_visit_separator by C<$self-E<gt>id_visit_separator()>. The namespace is the name of the repository housing the datasource.
+Each blocks holds a unique datasource configuration. Apart from some reserved parameters, C<namespace>, C<dsn>, C<username> and C<password> it is up to the user to decide what parameters they want to include in the configuration file. The user can specify the actual name of the datasource using the C<name> parameter provided the block name is an alias. If the C<name> parameter is not found then the block name is assumed to be the actual name of the datasource. In the example above, both Clinical and Clinical1 connect to the same datasource (i.e. Clinical) but with different configurations. Once this class has instantiated the datasource object, the user can access the parameters by simply calling the methods which have the same name as the parameters. For example, the database handle can be retrieved by C<$self-E<gt>dbh()> and id_visit_separator by C<$self-E<gt>id_visit_separator()>. The namespace is the name of the repository housing the datasource.
+
+=head2 new()
+
+    $object = $datasource_pkg->new();
+
+Basic constructor.
 
 =head1 PROCESSING
 
-After instantiating the datasource object this class attempts to perform the following operations:
+After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. $response != undef), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
+
+=head2 set_entity_parameters( $struct )
+
+This method attempts to retrieve the entity parameters, C<entity_count> and C<visit_max> (for longitudinal datasources) from the repository. The method accepts the input from L<entity_structure|/entity_structure()>. 
+
+=head2 set_table_parameters( $struct )
+
+This method attempts to set the information on tables and their attributes as a hash where, table names are keys and attribute name-value pairs are hash values. The table attributes are read from the C<-columns> field specified under the hash ref from L<table_structure|/table_structure()>.
+
+=head2 set_variable_parameters( $struct )
+
+This method attempts to set the information on variables and their attributes as a hash where, keys are table and variable names joined by a dot and, values are the attribute name-value pairs. Instead of using the variable names as keys the method uses the combination of the table and the variable name as keys because,
 
 =over
 
-=item 1
+=item a. 
 
-Authenticates the user. The subsequent steps are only performed if the authentication is successful.
+the resulting name also contains the name of the table, the variable was recorded under (e.g. MMSE.Total),
 
-=item 2
+=item b.
 
-Loads default parameters (if any).
-
-=item 3
-
-Validates the return from L<entity_structure|/entity_structure()> and attempts to set C<entity_count> and C<visit_max> (for longitudinal datasources only).
-
-=item 4
-
-Validates the return from L<table_structure|/table_structure()> and attempts to set tables and its attributes.
-
-=item 5
-
-Validates the return from L<variable_structure|/variable_structure()> and attempts to set variable and its attributes. The method also maps the variable types to their SQL types (default char(255)) only if L<datatype_map|/datatype_map()> is overidden.
-
-=item 6
-
-Sets visit variables for the longitudinal datasources. The visit variables are valid to dynamic tables only and they represents the visit transformation of variables e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var. The prefix V1 represents first visit of the variable 'var', V2 represents the second visit, Vany implies any visit and Vlast last visit.
+distinguishes one variable from the other as sometimes variables from different tables may have the same name (e.g. Subject.Sex and Informant.Sex). 
 
 =back
 
-=head1 Subclass Hooks
+=head2 set_visit_variables()
 
-The sub classes override the following hooks:
+This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are valid to dynamic tables only and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|/CohortExplorer::Command::Compare> command allows the use of visit variables when searching for entities of interest.
+
+=head1 SUBCLASS HOOKS
+
+The subclasses override the following hooks:
 
 =head2 authenticate( $opts )
 
-This method should return a response (a scalar) upon successful authentication otherwise undef. The method is called with one parameter, C<$opts> which is a hash with application options as keys and their user-provided values as hash values.
+This method should return a response (a scalar) upon successful authentication otherwise return C<undef>. The method is called with one parameter, C<$opts> which is a hash with application options as keys and their user-provided values as hash values. B<Note> the methods below are only called if the authentication is successful.
 
 =head2 default_parameters( $opts, $response )
 
@@ -579,9 +582,7 @@ This method should return a hash ref containing parameter name-value pairs. The 
    
 C<$opts> is a hash with application options as keys and their user-provided values as hash values.
 
-C<$response> is the response received after successful authentication. 
-
-B<Note> that this method and the methods below are only called if the authentication is successful.
+C<$response> is the response received upon successful authentication. 
 
 =head2 entity_structure()
 
@@ -603,11 +604,11 @@ C<visit> (only required for longitudinal datasources)
 
 =item B<-from>
 
-table specifications see L<SQL::Abstract::More|SQL::Abstract::More/Table_specifications>
+table specifications (see L<SQL::Abstract::More|SQL::Abstract::More/Table_specifications>)
 
 =item B<-where> 
 
-where clauses see L<SQL::Abstract|SQL::Abstract/WHERE_CLAUSES>
+where clauses (see L<SQL::Abstract|SQL::Abstract/WHERE_CLAUSES>)
 
 =back
 
@@ -628,7 +629,7 @@ The method should return a hash ref defining the table structure in the database
         -order_by => "field_order",
         -group_by => "form_name"
 
-      };
+      }
 
 the user should make sure the returned hash ref is able to produce the SQL output like the one below,
 
@@ -641,9 +642,9 @@ the user should make sure the returned hash ref is able to produce the SQL outpu
        | month_2_data      |              20 | Month 2 Data     |
        | month_3_data      |              28 | Month 3 Data     |
        | completion_data   |               6 | Completion Data  |
-       '-------------------+-----------------+------------------'
+       +-------------------+-----------------+------------------+
 
-B<Note> that C<-columns> hash ref must have the key C<table> corresponding to form/questionnaire names and others columns can be table attributes. It is up to the user to decide what table attributes they think are suitable for table description.
+B<Note> that C<-columns> hash ref must have the key C<table> corresponding to the name of form/questionnaire and others columns are table attributes. It is up to the user to decide what table attributes they think are suitable for the description of tables.
 
 =head2 variable_structure()
 
@@ -662,7 +663,7 @@ This method should return a hash ref defining the variable structure in the data
                         "project_id" => $self->project_id()
              },
              -order_by => "field_order"
-         };
+         }
 
 the user should make sure the returned hash ref is able to produce the SQL output like the one below,
 
@@ -682,17 +683,17 @@ B<Note> that C<-columns> hash ref must have the key C<variable> and C<table>. Ag
           
 =head2 datatype_map()
 
-This method should return a hash ref with variable type as keys and equivalent SQL type (i.e., castable) as value.
+This method should return a hash ref with variable type as keys and equivalent SQL type (i.e. castable) as value.
 
 =head1 SECURITY
 
-When setting-up CohortExplorer for group usage it is advised to install the application using its debian package which is part of the release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
+When setting CohortExplorer for group usage it is advised to install the application using its debian package which is part of the release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
 
 =over
 
 =item *
 
-forcing taint mode and,
+forcing the taint mode and,
 
 =item *
 
@@ -706,7 +707,7 @@ disabling the access to configuration files and log file to users other than the
 
 =item *
 
-The configuration file is unable to be parsed by L<Config::General>.
+L<Config::General> fails to parse the datasource configuration file.
 
 =item *
 
@@ -714,15 +715,15 @@ Failed to instantiate datasource package '<datasource pkg>' via new().
 
 =item *
 
-The return from methods C<default_paramters>, C<entity_structure>, C<table_structure>, C<variable_structure> is either not hash worthy or incomplete.
+The return from methods C<default_parameters>, C<entity_structure>, C<table_structure>, C<variable_structure> and C<datatype_map> is either not hash worthy or incomplete.
 
 =item *
 
-L<SQL::Abstract::More> is unable to construct the SQL query using the supplied hash ref.
+The C<select> method from L<SQL::Abstract::More> fails to construct the SQL from the supplied hash ref.
 
 =item *
 
-L<DBI> is unable to execute the SQL query.
+The method C<execute> from L<DBI> fails to execute the SQL query.
 
 =back
 
@@ -750,15 +751,15 @@ L<CohortExplorer::Application::Opal::Datasource>
 
 L<CohortExplorer::Application::REDCap::Datasource>
 
-L<CohortExplorer::Application::Command::Describe>
+L<CohortExplorer::Command::Describe>
 
-L<CohortExplorer::Application::Command::Find>
+L<CohortExplorer::Command::Find>
 
-L<CohortExplorer::Application::Command::History>
+L<CohortExplorer::Command::History>
 
-L<CohortExplorer::Application::Command::Query::Search>
+L<CohortExplorer::Command::Query::Search>
 
-L<CohortExplorer::Application::Command::Query::Compare>
+L<CohortExplorer::Command::Query::Compare>
 
 =head1 LICENSE AND COPYRIGHT
 

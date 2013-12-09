@@ -60,9 +60,8 @@ sub run {
 
         # Build a query to search variables based on keywords
         # Look for presence of keywords in -columns specified under $datasource->variable_structure method
-
-    my $struct = $datasource->variable_structure();
-       $struct->{$struct->{-group_by} ? -having : -where}{-or} = [
+        my $struct = $datasource->variable_structure();
+        $struct->{$struct->{-group_by} ? -having : -where}{-or} = [
         map {
                       local $_ = $struct->{-group_by} ? "`$_`" : $_;
 
@@ -160,7 +159,7 @@ Validates the command options and arguments and throws exception if validation f
 
 =head2 run( $opts, @args )
 
-This method  enables the user to search variable(s) using keywords. The command looks for the presence of keywords in C<-columns> specified under L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the inherited datasource class. The command attempts to output the variable dictionary (i.e. meta data) of variables that are found. The variable dictionary can include the following variable attributes:
+This method  enables the user to search variable(s) using keywords. The command looks for the presence of keywords in the columns specified under L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the inherited datasource class. The command attempts to output the variable dictionary (i.e. meta data) of variables that are found. The variable dictionary can include the following variable attributes:
 
 =over
 
@@ -206,7 +205,7 @@ Ignore case
 
 =head1 DIAGNOSTICS
 
-This command throws the following exceptions imported from L<CLI::Framework::Exception>:
+This command throws the following exceptions imported from L<CLI::Framework::Exceptions>:
 
 =over
 
@@ -247,16 +246,18 @@ L<SQL::Abstract::More>
 
 =head1 EXAMPLES
 
-find --fuzzy --ignore-case cancer (fuzzy and case insensitive search)
+ find --fuzzy --ignore-case cancer (fuzzy and case insensitive search)
 
-find SubjectDetails.Subject_Sex   (exact search)
+ find SubjectDetails.Subject_Sex (exact search)
 
-find -fi mmHg (options with bundling and aliases)
+ find -fi mmHg (options with bundling and aliases)
 
 
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 

@@ -10,8 +10,7 @@ use CLI::Framework::Exceptions qw( :all );
 
 #-------
 
-sub usage_text
-{    # Command is available to both standard and longitudinal datasources
+sub usage_text {    # Command is available to both standard and longitudinal datasources
 
 	q\
               search [--out|o=<directory>] [--export|e=<table>] [--export-all|a] [--save-command|s] [--stats|S] [--cond|c=<cond>] 
@@ -36,7 +35,7 @@ sub usage_text
 
                  search --out=/home/user/exports --export-all --cond=SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
 
-                 search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like','SUB100%'}" DIS.Status
+                 search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
 
                  search -o'/home/user/exports' -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
 
@@ -59,19 +58,17 @@ sub get_query_parameters {
 	my @vars = ( @args, grep { !$args{$_} } @vars_in_condition );
 
 	for (@vars) {
-		/^([^\.]+)\.(.+)$/
-		  ; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
+		/^([^\.]+)\.(.+)$/; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
 		my $table_type =
 		  $datasource_type eq 'standard'
 		  ? 'static'
 		  : ( grep ( /^$1$/, @static_tables ) ? 'static' : 'dynamic' );
 
-       # Build a hash with keys 'static' and 'dynamic'.
-       # Each key contains its own sql parameters
-       # In static tables the rows are grouped on Entity_ID where as in dynamic tables
-       # (i.e. longitudinal datasources) the rows are grouped on Entity_ID and Visit
-
-		push
+                # Build a hash with keys 'static' and 'dynamic'.
+                # Each key contains its own SQL parameters
+                # In static tables the rows are grouped on Entity_ID where as in dynamic tables
+                # (i.e. longitudinal datasources) the rows are grouped on Entity_ID and Visit
+                push
 		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
 		  $1;
 
@@ -100,7 +97,7 @@ sub get_query_parameters {
 
 		else {
 
-		   # Entity_ID and Visit are added to the list of SQL cols in dynamic param
+		        # Entity_ID and Visit are added to the list of SQL cols in dynamic param
 			unshift @{ $param{$_}{-columns} },
 			  (
 				$struct->{-columns}{entity_id} . '|`Entity_ID`',
@@ -145,7 +142,7 @@ sub process_result_set {
 	my $fh = FileHandle->new("> $dir/QueryOutput.csv")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
-	# Returns hash ref to hash with key being entity_id and value either:
+	# Returns hash ref to hash with key as entity_id and value either:
 	# list of visit numbers if the result-set contains visit column
 	# (i.e. dynamic tables- Longitudinal datasources) or,
 	# empty list (i.e. static tables)
@@ -184,9 +181,9 @@ sub process_table {
 
 	for (@$table_data) {
 
-        # For static tables (i.e. standard/longitudinal) datasources table data comprise of
-        # entity_id (0), variable (1) and value (2) and,
-        # dynamic tables ( longitudinal datasources only) contain visit (3) in addition
+                # For static tables (i.e. standard/longitudinal) datasources table data comprise of
+                # entity_id (0), variable (1) and value (2) and,
+                # dynamic tables ( longitudinal datasources only) contain visit (3) in addition
 		if ( $table_type eq 'static' ) {
 			$data{ $_->[0] }{ $_->[1] } = $_->[2];
 		}
@@ -219,7 +216,7 @@ sub process_table {
 			  ? print $fh $csv->string() . "\n"
 			  : throw_cmd_run_exception( error => $csv->error_input() );
 		}
-		else {    # For dynamic tables
+		else {  # For dynamic tables
 			for my $visit (
 				  @{ $result_entity->{$entity} }
 				? @{ $result_entity->{$entity} }
@@ -281,13 +278,17 @@ The search command enables the user to search entities using variables of intere
 
 This class is inherited from L<CohortExplorer::Command::Query> and overrides the following methods:
 
+=head2 usage_text()
+
+This method returns the usage information for the command.
+
 =head2 get_query_parameters( $opts, $datasource, @args )
 
 This method returns a hash ref with keys, C<static>, C<dynamic> or C<both> depending on the datasource type and variables supplied within arguments and conditions. The value of each key is a hash containing SQL parameters, C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
 
 =head2 process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args ) 
         
-This method returns a hash ref with keys as entity ids and values either a list of visit numbers if the result-set contains visit column (i.e., dynamic tables- longitudinal datasources), or empty list (i.e., static tables - standard/longitudinal datasources )
+This method returns a hash ref with keys as C<Entity_ID> and values either a list of visit numbers, if the result-set contains visit column (i.e. dynamic tables- longitudinal datasources), or empty list (i.e. static tables - standard/longitudinal datasources )
 
 =head2 process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity ) 
         
@@ -295,7 +296,7 @@ This method writes the table data into a csv file for entities present in the re
 
 =head2 get_stats_data( $result_set )
         
-This method returns a hash ref with entity_id as keys and variable-value hash as its value. If the result set contains visit column then the data is grouped by visit (i.e., dynamic tables/longitudinal datasources).
+This method returns a hash ref with C<Visit> as keys and variable-value hash as its value provided, at least one variable in the query-set belongs to the dynamic table. For all other cases it simply returns a hash ref with variable-value pairs.
   
 =head1 OPTIONS
 
@@ -323,33 +324,35 @@ Show summary statistics
 
 =item B<-c> I<COND>, B<--cond>=I<COND>
             
-Impose conditions using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in and regexp.
+Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<gt>=>, C<E<lt>>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in> and C<regexp>.
 
 =back
 
 =head1 NOTES
 
-The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as arguments as they are already part of the query-set. However, the user has the liberty to impose conditions on both C<Entity_ID> and C<Visit>, using the condition option. The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
+The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as arguments as they are already part of the query-set. However, the user has the liberty to impose conditions on both C<Entity_ID> and C<Visit>, using the C<cond> option. The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
 
 =head1 EXAMPLES
 
-search --out=/home/user/exports --cond=DS.Status="{'=','CTL'}" --stats --save-search --cond=CER.Score="{'<=','30'}" SC.Date FH.Ethnicity
+ search --out=/home/user/exports --cond=DS.Status="{'=','CTL'}" --stats --save-search --cond=CER.Score="{'<=','30'}" SC.Date FH.Ethnicity
 
-search --out=/home/user/exports --export-all --cond=SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
+ search --out=/home/user/exports --export-all --cond=SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
 
-search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like','SUB100%'}" DIS.Status
+ search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
 
-search -o'/home/user/exports' -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
+ search -o'/home/user/exports' -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
 
-search -o'/home/user/exports' -c CER.Score="{'between',['25','30']}" DIS.Status
+ search -o'/home/user/exports' -c CER.Score="{'between',['25','30']}" DIS.Status
 
 =head1 DIAGNOSTICS
 
-This class throws C<throw_cmd_run_exception> exception imported from L<CLI::Framework::Exception> if L<Text::CSV_XS> fails to construct a csv string from the list containing variables' values.
+This class throws C<throw_cmd_run_exception> exception imported from L<CLI::Framework::Exceptions> if L<Text::CSV_XS> fails to construct a csv string from the list containing variables' values.
 
 =head1 SEE ALSO
 
 L<CohortExplorer>
+
+L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 
