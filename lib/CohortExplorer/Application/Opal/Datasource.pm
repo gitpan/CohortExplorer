@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -95,6 +95,7 @@ sub default_parameters {
 
         else {
                 $default{id_visit_separator} = undef;
+                $default{static_tables} = $default{allowed_tables};
         }
 
 	return \%default;
@@ -142,7 +143,7 @@ sub table_structure {
 
 		-columns => {
 			table => "GROUP_CONCAT( DISTINCT vt.name)",
-			varible_count => "COUNT( DISTINCT var.id)",
+			variable_count => "COUNT( DISTINCT var.id)",
 			entity_type   => "GROUP_CONCAT( DISTINCT vt.entity_type )"
 		},
 		-from => [
@@ -258,7 +259,7 @@ This method returns a hash ref containing all default parameters. By default,
 
 =head2 entity_structure()
 
-This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the entity_id and visit number on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The id_visit_separator can also be a string (e.g. PARTIOP1, PARTIOP2).
+This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the entity_id and visit number on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The C<id_visit_separator> can also be a string (e.g. PARTIOP1, PARTIOP2).
 
 =head2 table_structure()
 

@@ -162,7 +162,7 @@ L<CohortExplorer::Datasource>
 
 L<CohortExplorer::Command::Describe>
 
-L<CohortExplorer:Command::Find>
+L<CohortExplorer::Command::Find>
 
 L<CohortExplorer::Command::Query::Search>
 

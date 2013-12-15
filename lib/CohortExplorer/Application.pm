@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 # Directory list for command-line completion
 my @DIRS;
@@ -34,18 +34,18 @@ sub usage_text {
                             -u  --username    : provide username
                             -p  --password    : provide password
 
-                            -v  --verbose     : print with verbosity
-                            -h  --help        : print usage message and exit
+                            -v  --verbose     : show with verbosity
+                            -h  --help        : show usage message and exit
                             
 
                     COMMANDS
                              help      - show application or command-specific help
                              menu      - show menu of available commands
-                             search    - search entities with/without condition(s) condition(s) on variable(s)
+                             search    - search entities with/without conditions on variables
                              compare   - compare entities across visits (applicable only to longitudinal datasources)
                              describe  - show datasource description including entity count 
                              history   - show saved commands
-                             find      - find variable(s) using keyword(s) 
+                             find      - find variables using keywords 
                              console   - start a command console for the application
             
  };
@@ -56,13 +56,13 @@ sub option_spec {
 	  # Username, password and datasource name are mandatory options
 	  # Password may or may not be provided at start
 	  [],
-	  [ 'datasource|d:s' => 'provide datasource' ],
-	  [ 'username|u:s'   => 'provide username' ],
-	  [ 'password|p:s'   => 'provide password' ],
+	  [ 'datasource|d:s' => 'provide datasource'           ],
+	  [ 'username|u:s'   => 'provide username'             ],
+	  [ 'password|p:s'   => 'provide password'             ],
 	  [],
-	  [ 'verbose|v' => 'print with verbosity' ],
-	  [ 'help|h'    => 'print usage message and exit' ],
-	  []
+	  [ 'verbose|v'      => 'show with verbosity'          ],
+	  [ 'help|h'         => 'show usage message and exit'  ],
+	  [] 
 
 }
 
@@ -77,7 +77,7 @@ sub validate_options {
 	}
 
 	else {
-		if (       !$opts->{datasource}
+		if (   !$opts->{datasource}
 			|| !$opts->{username}
 			|| !exists $opts->{password} )
 		{
@@ -102,7 +102,7 @@ sub command_map {
 
 sub command_alias {
 
-	h      => 'help',
+	  h    => 'help',
 	  m    => 'menu',
 	  s    => 'search',
 	  c    => 'compare',
@@ -138,7 +138,7 @@ sub render {
 
 	my ( $app, $output ) = @_;
 
-	# Output from commands (not help) is hash with keys headingText and rows
+	# Output from commands (excluding help) is hash with keys headingText and rows
 	# headingText = a scalar with table heading
 	# rows = ref to array of arrays
 	if ( ref $output eq 'HASH' ) {
@@ -197,8 +197,7 @@ sub handle_exception {
 	my $cache = $app->cache->get('cache');
 
 	# Logs exceptions
-	$cache->{logger}
-	  ->error( $e->description() . ' [ User: ', $cache->{user} . ' ]' )
+	$cache->{logger}->error( $e->description() . ' [ User: ', $cache->{user} . ' ]' )
 	  if ($cache);
 
 	return;
@@ -210,11 +209,8 @@ sub pre_dispatch {
 
 	my $cache = $app->cache->get('cache');
 
-        # Search, compare and history commands are application dependent as they,
-        # require the user to have access to at least one variable from table(s) and,
-        # depend on the datasource type
 	my @invalid_commands =
-	  grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
+	   grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
 
 	my $current_command = $app->get_current_command();
 
@@ -245,6 +241,7 @@ sub read_cmd {
 
 		# Arrange for command-line completion
 		my $attribs = $term->Attribs;
+		$attribs->ornaments(0);
 		$attribs->{completion_function} = $app->_cmd_request_completions();
 	}
 
@@ -252,7 +249,7 @@ sub read_cmd {
 	# Store the individual tokens that are read in @ARGV
 
 	my $command_request =
-	  $term->readline( '[' . $app->cache->get('cache')->{user} . ']$ ' );
+	  $term->readline( $app->cache->get('cache')->{user} . '# ' );
 
 	if ( !defined $command_request ) {
 
@@ -277,55 +274,98 @@ sub _cmd_request_completions {
 
 	# Valid only when the application is running in console/interactive mode
 	return sub {
+		
 		my ( $text, $line, $start ) = @_;
-		my $datasource = $app->cache->get('cache')->{datasource};
+		my $datasource      = $app->cache->get('cache')->{datasource};
+		my $datasource_type = $datasource->type();
 
 		# Listen to search/compare commands
-		if ( $line =~ /^\s*(search|compare|s|c)\s+/ ) {
+		if ( $line =~ /^\s*(search|compare|find|history|[scf]|hist)\s+/ ) {
 			my $cmd = $1;
 
 			# Make completion work with command aliases
 			$cmd = 'search'  if ( $cmd eq 's' );
 			$cmd = 'compare' if ( $cmd eq 'c' );
+			$cmd = 'find'    if ( $cmd eq 'f' );
+			$cmd = 'history' if ( $cmd eq 'hist' );
 
-			# Ensure search/compare are valid commands
+			# Ensure search/compare/history/find are valid commands
 			unless ( !$app->is_interactive_command($cmd) ) {
 
-				# Listen to 'output dir' option
-				if ( $line =~ /(\-\-out=|\-o\s*)\'?$text$/ ) {
+				# Listen to options
+				if ( $text =~ /^\s*\-/ ) {
+					return qw(--show --clear)         if ( $cmd eq 'history' );
+					return qw(--fuzzy --ignore-case) if ( $cmd eq 'find' );
+					return
+					  qw(--out --cond --save-command --stats --export --export-all)
+					  if ( $cmd =~ /^(search|compare)$/ );
+
+				}
+				if ( $cmd =~ /^(search|compare)$/
+					&& substr( $line, 0, $start - 1 ) =~ /(\-o|\-\-out)\s*$/ )
+				{
 					return @DIRS;
 				}
 
-				# Listen to 'export' option
-				elsif ( $line =~ /(\-\-export=|\-e\s*)\'?$text$/ ) {
+				if ( $cmd =~ /^(search|compare)$/
+					&& substr( $line, 0, $start - 1 ) =~ /(\-e|\-\-export)\s*$/ )
+				{
 					return keys %{ $datasource->tables() };
 				}
 
-				# Listen to arguments/condition (option)
+				if (   $cmd eq 'search'
+					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
+				{
+					return
+					  map { $_ . "=\"{'opr','val'}\"" }
+					  ( $datasource_type eq 'standard'
+						? qw(Entity_ID)
+						: qw(Entity_ID Visit) ),
+					  keys %{ $datasource->variables() };
+				}
+
+				if (   $cmd eq 'compare'
+					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
+				{
+					return map { $_ . "=\"{'opr','val'}\"" }
+					  (
+                                                qw(Entity_ID),
+						keys %{ $datasource->variables() },
+						@{ $datasource->visit_variables() || [] }
+					  );
+				}
+
+				# Listen to arguments
 				else {
 					if ( $cmd eq 'search' ) {
-						return keys %{ $datasource->variables() };
+					     return keys %{ $datasource->variables() };
 					}
-					else {
+
+                                        elsif ( $cmd eq 'find' ) {
+                                                return keys %{ $datasource->tables() };
+                                        }
+
+					elsif ( $cmd eq 'compare' ) {
 						return (
 							keys %{ $datasource->variables() },
 							@{ $datasource->visit_variables() || [] }
 						);
 					}
+					else {
+						return undef;
+					}
 				}
 			}
 		}
 
-		# Listen to help command
-		return grep( $_ ne 'help', $app->get_interactive_commands() )
-		  if ( $line =~ /^\s*help/ );
+		# help command
+		return $app->get_interactive_commands() if ( $line =~ /^\s*help/ );
 
-		# Listen to describe and history commands
-		return undef if ( $line =~ /^describe|history/ );
+		# describe command
+		return undef if ( $line =~ /^\s*describe/ );
 
-		# Default listening returns all interactive commands
-		return grep( /^\s*$text/, $app->get_interactive_commands() )
-		  if ( $start >= 0 );
+		# default
+		return $app->get_interactive_commands() if ( $line =~ /^\s*/ );
 
 	  }
 }
@@ -337,7 +377,7 @@ sub init {
 	require Log::Log4perl;
 
 	# Initialise logger
-	eval { Log::Log4perl::init( $LOG_CONFIG_FILE ); };
+	eval { Log::Log4perl::init($LOG_CONFIG_FILE); };
 
 	if ( catch my $e ) {
 	     throw_app_init_exception( error => $e );
@@ -345,21 +385,21 @@ sub init {
 
 	my $logger = Log::Log4perl->get_logger();
 
-        # Prompt for password, if not provided at command line
+	# Prompt for password if not provided at command line
 	unless ( $opts->{password} ) {
-                 $app->render("Enter password: ");
-                 ReadMode 'noecho';
-                 $opts->{password} = ReadLine(10);
-                 ReadMode 'normal';
-                 $app->render("\n");
-             
-                 unless ( $opts->{password} ) {
-                          $app->render("timeout\n");
-	                  exit;
-                 }
-        }      
-        
-        chomp $opts->{password};
+		 $app->render("Enter password: ");
+		 ReadMode 'noecho';
+		 $opts->{password} = ReadLine(10);
+		 ReadMode 'normal';
+		 $app->render("\n");
+
+		 unless ( $opts->{password} ) {
+		          $app->render("timeout\n");
+			  exit;
+		 }
+	}
+
+	chomp $opts->{password};
 
 	# Initialise the datasource and store in cache for further use
 	$app->cache->set(
@@ -373,32 +413,38 @@ sub init {
 
 	if ( $app->get_current_command() eq 'console' ) {
 
-		# No autocompletion if search is not a valid command
+                # If search is a valid command then compile a list of directories 
+                # 'out' option's commmand-line completion
 		if ( !grep( $_ eq 'search', $app->noninteractive_commands() ) ) {
-		      
-                      # Get all directories under /root if the user is root, otherwise under $HOME
-	              no warnings 'File::Find';
 
-	              my $username = getlogin() || getpwuid($<) || $ENV{LOGNAME} || $ENV{USER};
-                      eval {
-		               find(
-			              {
-				        wanted => sub {
-					                push @DIRS, $_ if ( -d );
-				                      },
-				                      untaint  => 1,
-				                      no_chdir => 1
-			              },
-			              $username eq 'root' ? '/root' : '/home/' . $username
-		                   );
-	                };
+	                # If the user is root get all subdirectories under /root, otherwise $HOME
+			no warnings 'File::Find';
 
-	                if ( catch my $e ) {
-		             throw_app_init_exception( error => $e );
-                        }
+			my $username =
+			     getlogin()
+			  || getpwuid($<)
+			  || $ENV{LOGNAME}
+			  || $ENV{USER};
+			eval {
+			      finddepth(
+					{
+						wanted => sub {
+							        push @DIRS, $_ if (-d);
+						},
+						untaint  => 1,
+						no_chdir => 1
+					},
+					$username eq 'root' ? '/root' : '/home/' . $username
+				);
+			};
+
+			if ( catch my $e ) {
+				throw_app_init_exception( error => $e );
+			}
 		}
+
 		$app->render(
-			"Welcome to the CohortExplorer version $VERSION console." . "\n\n"
+			    "Welcome to the CohortExplorer version $VERSION console." . "\n\n"
 			  . "Type 'help <COMMAND>' for command specific help." . "\n"
 			  . "Use tab for command-line completion and ctrl + L to clear the screen."
 			  . "\n"
@@ -407,7 +453,6 @@ sub init {
 
 	return;
 }
-
 
 #-------
 1;
@@ -436,8 +481,8 @@ This method returns the application option specifications as expected by L<Getop
      [ 'datasource|d:s' => 'provide datasource'           ],
      [ 'username|u:s'   => 'provide username'             ],
      [ 'password|p:s'   => 'provide password'             ],
-     [ 'verbose|v'      => 'print with verbosity'         ],
-     [ 'help|h'         => 'print usage message and exit' ] 
+     [ 'verbose|v'      => 'show with verbosity'          ],
+     [ 'help|h'         => 'show usage message and exit'  ] 
    )
 
 =head2 validate_options( $opts )
@@ -525,9 +570,11 @@ In case of no exceptions, it captures the output returned by the commands and di
 
 =head1 ERROR HANDLING
 
-All exceptions thrown within CohortExplorer are treated by the C<handle_exception( $e )> method. The exceptions are imported from L<CLI::Framework::Exceptions>.
+All exceptions thrown within CohortExplorer are treated by C<handle_exception( $e )>. The exceptions are imported from L<CLI::Framework::Exceptions>.
  
 =head1 DEPENDENCIES
+
+Carp
 
 L<CLI::Framework::Application>
 

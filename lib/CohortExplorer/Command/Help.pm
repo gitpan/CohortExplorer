@@ -75,11 +75,11 @@ __END__
 
 =head1 NAME
 
-CLI::Framework::Command::Help - CohortExplorer command to show application or command specific usage
+CohortExplorer::Command::Help - CohortExplorer command to show application or command specific usage
 
 =head1 DESCRIPTION
 
-This class is inherited from L<CLI::Framework::Command::Help> and overrides the methods below:
+This class is inherited from L<CLI::Framework::Command::Meta> and overrides the methods below:
 
 =head2 usage_text()
 

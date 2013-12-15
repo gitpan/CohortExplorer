@@ -19,6 +19,7 @@ t/00-load.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
-debian/cohortexplorer_0.02-1_all.deb
+debian/cohortexplorer_0.03-1_all.deb
 config_files/datasource-config.properties
 config_files/log-config.properties
+META.yml

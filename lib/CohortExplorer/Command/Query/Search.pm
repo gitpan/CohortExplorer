@@ -14,14 +14,14 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
 
 	q\
               search [--out|o=<directory>] [--export|e=<table>] [--export-all|a] [--save-command|s] [--stats|S] [--cond|c=<cond>] 
-              [variable] : search entities with/without condition(s) on variable(s)
+              [variable] : search entities with/without conditions on variables
               
               
               NOTES
-                 The variables Entity_ID and Visit (if applicable) must not be provided as args as they are already part of the 
-                 query-set however, both can be used to impose conditions.
+                 The variables Entity_ID and Visit (if applicable) must not be provided as arguments as they are already part of
+                 the query-set however, both can be used to impose conditions.
 
-                 Other variables in args/cond (option) must be referenced as 'Table.Variable'.
+                 Other variables in arguments/cond (option) must be referenced as 'Table.Variable'.
 
                  The conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, 
                  not_in and regexp.
@@ -30,16 +30,15 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
 
 
               EXAMPLES
-                 search --out=/home/user/exports --cond=DS.Status="{'=','CTL'}" --stats --save-search --cond=CER.Score="{'<=','30'}"
-                          SC.Date FH.Ethnicity
+                 search --out /home/user/exports --stats --save-command --cond CER.Score="{'<=','30'}" SC.Date
 
-                 search --out=/home/user/exports --export-all --cond=SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
+                 search --out /home/user/exports --export-all --cond SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
 
-                 search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
+                 search -o /home/user/exports -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
 
-                 search -o'/home/user/exports' -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
+                 search -o /home/user/exports -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
 
-                 search -o'/home/user/exports' -c CER.Score="{'between',['25','30']}" DIS.Status
+                 search -o /home/user/exports -c CER.Score="{'between',['25','30']}" DIS.Status
  \;
 }
 
@@ -264,7 +263,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query::Search - CohortExplorer class to search entities with or without condition(s) on variable(s)
+CohortExplorer::Command::Query::Search - CohortExplorer class to search entities with or without conditions on variables
 
 =head1 SYNOPSIS
 
@@ -334,15 +333,15 @@ The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as 
 
 =head1 EXAMPLES
 
- search --out=/home/user/exports --cond=DS.Status="{'=','CTL'}" --stats --save-search --cond=CER.Score="{'<=','30'}" SC.Date FH.Ethnicity
+ search --out /home/user/exports --stats --save-command --cond DS.Status="{'=','CTL'}" SC.Date
 
- search --out=/home/user/exports --export-all --cond=SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
+ search --out /home/user/exports --export-all --cond SD.Subject_Sex="{'=','Male'}" CER.Score DIS.Status
 
- search -o'/home/user/exports' -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
+ search -o /home/user/exports -e DS -e SD -c Entity_ID="{'like',['SUB100%','SUB200%']}" DIS.Status
 
- search -o'/home/user/exports' -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
+ search -o /home/user/exports -Ssa -c Visit="{'in',['1','3','5']}" DIS.Status 
 
- search -o'/home/user/exports' -c CER.Score="{'between',['25','30']}" DIS.Status
+ search -o /home/user/exports -c CER.Score="{'between',['25','30']}" DIS.Status
 
 =head1 DIAGNOSTICS
 

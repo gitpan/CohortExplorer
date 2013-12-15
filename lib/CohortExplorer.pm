@@ -7,7 +7,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 use CohortExplorer::Application;
 
@@ -21,7 +21,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer - Explore clinical cohorts and search for entities and variables of interest
+CohortExplorer - Explore clinical cohorts and search for entities of interest
 
 =head1 SYNOPSIS
 
@@ -29,7 +29,7 @@ B<CohortExplorer [OPTIONS] COMMAND [COMMAND-OPTIONS]>
 
 =head1 DESCRIPTION
 
-CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the datasource API (L<CohortExplorer::Datasource>). CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
+CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the L<datasource API|/CohortExplorer::Datasource>. CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
 
 The application makes use of the following concepts to explore clinical repositories within the EAV framework:
 
@@ -57,7 +57,7 @@ The questions, which form part of the study, are called variables and values are
 
 =item B<Static table> 
 
-Questionnaires in a datasource, which record the entity data only once, are grouped under the static table. All tables within standard (or non-longitudinal) datasources are static. However, the longitudinal datasources may also contain some questionnaires that can be grouped under the static table (e.g., Demographics or SubjectDetails).
+Questionnaires in a datasource, which record the entity data only once, are grouped under the static table. All tables within standard (or non-longitudinal) datasources are static. However, the longitudinal datasources may also contain some questionnaires that can be grouped under the static table (e.g., Demographics or FamilyHistory).
       
 =item B<Dynamic table> 
 
@@ -131,11 +131,11 @@ Provide password
 
 =item B<-h>, B<--help>
 
-Print usage message and exit
+Show usage message and exit
 
 =item B<-v>, B<--verbose>
 
-Print with verbosity
+Show with verbosity
 
 =back
 
@@ -169,21 +169,39 @@ This command enables the user to see the history of saved commands. The user can
 
 =head1 EXAMPLES
 
- [somebody@somewhere]$ CohortExplorer --datasource=Clinical --username=administrator --password describe (run describe command)
+ [somebody@somewhere]$ CohortExplorer --datasource Clinical --username administrator --password describe (run describe command)
 
- [somebody@somewhere]$ CohortExplorer -v -dClinical -uadministrator -p console (start console in verbose mode)
+ [somebody@somewhere]$ CohortExplorer -v -d Clinical -u administrator -p console (start console in verbose mode)
    
- [somebody@somewhere]$ CohortExplorer -dClinical -uguest -p f -fi cancer diabetes (run find command with aliases)
+ [somebody@somewhere]$ CohortExplorer -d Clinical -u guest -p find -fi cancer diabetes (run find command with aliases)
+
+=head1 SECURITY
+
+When setting CohortExplorer for group use it is recommended to install the application using its debian package which is part of the release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
+
+=over
+
+=item *
+
+forcing the taint mode and,
+
+=item *
+
+disabling the access to configuration files and log file to users other than the administrator or root (user).
+
+=back
 
 =head1 BUGS
 
-Currently the application does not support the querying of datasources with multiple-arms. The application is only tested with clinical repositories using the EAV schema implemented under MySQL framework. The application is yet to be tested with repositories set-up using Oracle and SQL-server. Please report any bugs or feature requests to adixit@cpan.org.
+Currently the application does not support the querying of datasources with multiple arms. The application is only tested with clinical repositories using MySQL. The application is yet to be tested with repositories set-up using Oracle and SQL-server. Please report any bugs or feature requests to adixit@cpan.org.
 
 =head1 DEPENDENCIES
 
-L<CLI::Framework::Application>
+L<CLI::Framework>
 
-L<CLI::Framework::Exceptions>
+L<Config::General>
+
+L<DBI>
 
 L<Exception::Class::TryCatch>
 
@@ -191,9 +209,13 @@ L<File::Find>
 
 L<Log::Log4perl>
 
+L<SQL::Abstract::More>
+
 L<Term::ReadKey>
 
 L<Text::ASCIITable>
+
+L<Tie::IxHash>
 
 =head1 SEE ALSO
 

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 30;
@@ -39,7 +39,7 @@ BEGIN {
 	};
 
 	if ( catch my $e ) {
-		throw_cmd_run_exception( error => $e );
+	     throw_cmd_run_exception( error => $e );
 	}
 
 	$COMMAND_HISTORY = { $COMMAND_HISTORY_CONFIG->getall() };
@@ -50,7 +50,7 @@ sub option_spec {
 
 	(
 		[],
-		[ 'cond|c=s%'      => 'impose condition(s)'                         ],
+		[ 'cond|c=s%'      => 'impose conditions'                           ],
 		[ 'out|o=s'        => 'provide output directory', { required => 1 } ],
 		[ 'save-command|s' => 'save command'                                ],
 		[ 'stats|S'        => 'show summary statistics'                     ],
@@ -145,7 +145,7 @@ sub validate {
 		}
 		else {
 			throw_cmd_validation_exception(
-				error => "Invalid format for condition option in '$var'" );
+				error => "Invalid format for condition option ('$var')" );
 		}
 	}
 }
@@ -316,19 +316,19 @@ sub save_command {
 	# Construct the command run by the user and store it in $COMMAND_HISTORY
 	for my $opt ( keys %$opts ) {
 		if ( ref $opts->{$opt} eq 'ARRAY' ) {
-			$command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
+			$command .= " --$opt " . join( " --$opt ", @{ $opts->{$opt} } );
 		}
 		elsif ( ref $opts->{$opt} eq 'HASH' ) {
 			$command .= join(
 				' ',
-				map ( "--$opt=$_=\"$opts->{$opt}{$_}\" ",
+				map ( "--$opt $_=\"$opts->{$opt}{$_}\" ",
 					keys %{ $opts->{$opt} } )
 			);
 		}
 		else {
 			( $_ = $opt ) =~ s/_/-/g;
-			$command .= " --$_=$opts->{$opt} ";
-			$command =~ s/($_)=1/$1/;
+			$command .= " --$_ $opts->{$opt} ";
+			$command =~ s/($_) 1/$1/;
 
 			# Remove the 'save-command' option from the command
 			$command =~ s/--save-command/ /;
@@ -613,7 +613,7 @@ This class serves as the base class to search and compare command classes. The c
 Returns application option specifications as expected by L<Getopt::Long::Descriptive>
 
        ( 
-         [ 'cond|c=s%'      => 'impose condition(s)'                         ],
+         [ 'cond|c=s%'      => 'impose conditions'                           ],
          [ 'out|o=s'        => 'provide output directory', { required => 1 } ],
          [ 'save-command|s' => 'save command'                                ],
          [ 'stats|S'        => 'show summary statistics'                     ],
@@ -643,7 +643,7 @@ This method is only called if the user has specified the save command option (i.
 
 =head2 export_data( $opts, $cache, $result_set, $dir, $csv, @args )
 
-This method creates a output directory under the directory specified by the C<--out> option and calls the L<process_result_set|/process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args )> method of the subclass. The further processing by the method depends on the presence of C<--export> option(s). If the user has provided the C<--export> option, the method first constructs the SQL from L<entity_structure|CohortExplorer::Datasource/entity_structure()> with a table name placeholder. The method executes the same SQL with a different bind parameter (i.e. table name) depending upon the number of tables to be exported. The output obtained from successful execution of SQL is passed to L<process_table|/process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity )> for further processing.
+This method creates a output directory under the directory specified by the C<--out> option and calls L<process_result_set|/process_result_set( $opts, $datasource, $result_set, $dir, $csv, @args )> method of the subclass. The further processing by the method depends on the presence of C<--export> option(s). If the user has provided the C<--export> option, the method first constructs the SQL from L<entity_structure|CohortExplorer::Datasource/entity_structure()> with a table name placeholder. The method executes the same SQL with a different bind parameter (i.e. table name) depending upon the number of tables to be exported. The output obtained from successful execution of SQL is passed to L<process_table|/process_table( $table, $datasource, $table_data, $dir, $csv, $result_entity )> for further processing.
 
 
 =head2 summary_stats( $opts, $cache, $result_set, $dir, $csv )

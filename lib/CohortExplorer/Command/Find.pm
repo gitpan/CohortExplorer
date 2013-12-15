@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -14,13 +14,13 @@ use Exception::Class::TryCatch;
 sub usage_text {
 
     q{
-         find [--fuzzy|f] [--ignore-case|i] [keyword] : find variable(s) using keyword(s)
+         find [--fuzzy|f] [--ignore-case|i] [keyword] : find variables using keywords
 
          
          EXAMPLES
-             find --fuzzy --ignore-case cancer diabetes mmhg  (fuzzy and case insensitive search)
+             find --fuzzy --ignore-case cancer diabetes	 (fuzzy and case insensitive search)
 
-             find SubjectDetails.Subject_Sex  (exact search)
+             find Demographics  (exact search)
 
              find -fi mmHg  (options with bundling and aliases)
       
@@ -54,7 +54,7 @@ sub run {
     my $oper = $opts->{fuzzy} ? $opts->{ignore_case} ? -like : 'like binary' : -in;
     @args = $opts->{fuzzy} ? map { "\%$_%" } @args : @args;
 
-    eval 'require ' . ref $datasource;    # May or may not be preloaded
+        eval 'require ' . ref $datasource;    # May or may not be preloaded
     
         my ( $stmt, @bind, $sth );
 
@@ -63,17 +63,16 @@ sub run {
         my $struct = $datasource->variable_structure();
         $struct->{$struct->{-group_by} ? -having : -where}{-or} = [
         map {
-                      local $_ = $struct->{-group_by} ? "`$_`" : $_;
+                {
+                  $opts->{ignore_case} ? $_ : $_ => { $oper => [@args] }
+                }
 
-            {
-                                
-                $opts->{ignore_case} ? $_ : $_ => { $oper => [@args] };
             }
-          } $struct->{-group_by} ? keys %{ $struct->{-columns} } : values %{ $struct->{-columns} }
-    ];
+               $struct->{-group_by} ? map { "`$_`" } keys %{ $struct->{-columns} } : values %{ $struct->{-columns} }
+        ];
 
         # Make sure 'variable' and 'table' are the first two columns followed by variable attributes
-        my @columns = ( qw/variable table/, grep ( !/^(table|variable)$/, keys %{$struct->{-columns}} ) );
+        my @columns = ( qw/table variable/, grep ( !/^(table|variable)$/, keys %{$struct->{-columns}} ) );
         $struct->{-columns} = [ map { $struct->{-columns}{$_} . "|`$_`" } @columns ];
 
         eval {
@@ -130,7 +129,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Find - CohortExplorer class to find variable(s) using keywords
+CohortExplorer::Command::Find - CohortExplorer class to find variables using keywords
 
 =head1 SYNOPSIS
 
@@ -159,7 +158,7 @@ Validates the command options and arguments and throws exception if validation f
 
 =head2 run( $opts, @args )
 
-This method  enables the user to search variable(s) using keywords. The command looks for the presence of keywords in the columns specified under L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the inherited datasource class. The command attempts to output the variable dictionary (i.e. meta data) of variables that are found. The variable dictionary can include the following variable attributes:
+This method  enables the user to search variables using keywords. The command looks for the presence of keywords in the columns specified under L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the inherited datasource class. The command attempts to output the variable dictionary (i.e. meta data) of variables that are found. The variable dictionary can include the following variable attributes:
 
 =over
 
@@ -246,9 +245,9 @@ L<SQL::Abstract::More>
 
 =head1 EXAMPLES
 
- find --fuzzy --ignore-case cancer (fuzzy and case insensitive search)
+ find --fuzzy --ignore-case cancer diabetes (fuzzy and case insensitive search)
 
- find SubjectDetails.Subject_Sex (exact search)
+ find Demographics (exact search)
 
  find -fi mmHg (options with bundling and aliases)
 

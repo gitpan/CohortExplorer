@@ -6,4 +6,12 @@ Revision history for CohortExplorer
 
 0.02    2013-12-09
 
-        Documentation corrections.
+        Documentation corrections and minor code changes
+
+0.03    2013-12-15
+
+        Fixed some broken links within documentation and improved the command-line completion.
+        The application now allows the auto-completion of options and their values. For a given commmand 
+        all possible options can be seen by typing the command name followed by '--' and pressing the tab key. 
+        The user is also able to see all possible values the options can take by pressing the tab key after 
+        specifying the option name.

@@ -1,4 +1,3 @@
-use 5.006;
 use strict;
 use warnings;
 use ExtUtils::MakeMaker;
@@ -7,7 +6,7 @@ WriteMakefile(
 	NAME         => 'CohortExplorer',
 	AUTHOR       => 'Abhishek Dixit <adixit@cpan.org>',
 	VERSION_FROM => 'lib/CohortExplorer.pm',
-	ABSTRACT => 'Explore clinical cohorts and search for entities and variables of interest',
+	ABSTRACT => 'Explore clinical cohorts and search for entities of interest',
 	( $ExtUtils::MakeMaker::VERSION >= 6.3002
 		? ( 'LICENSE' => 'perl' )
 		: () ),

@@ -1,5 +1,5 @@
 ---
-abstract: 'Explore clinical cohorts and search for entities and variables of interest'
+abstract: 'Explore clinical cohorts and search for entities of interest'
 author:
   - 'Abhishek Dixit <adixit@cpan.org>'
 build_requires:
@@ -35,4 +35,4 @@ requires:
   Text::CSV_XS: 0
   Tie::IxHash: 0
   Time::HiRes: 0
-version: 0.02
+version: 0.03

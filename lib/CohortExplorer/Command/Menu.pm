@@ -45,7 +45,7 @@ CohortExplorer::Command::Menu - CohortExplorer command to show a command menu
 
 =head1 DESCRIPTION
 
-This class is inherited from L<CLI::Framework::Command::Menu> and overrides the C<menu_txt()> method.
+This class is inherited from L<CLI::Framework::Command::Menu> and overrides C<menu_txt()>.
 
 =head2 menu_txt()
 

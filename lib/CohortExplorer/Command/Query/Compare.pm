@@ -14,34 +14,33 @@ sub usage_text {    # Command is only available to longitudinal datasources
 
 	q\
                 compare [--out|o=<directory>] [--export|e=<table>] [--export-all|a] [--save-command|s] [--stats|S] [--cond|c=<cond>]
-                [variable] : compare entities across visits with/without condition(s) on variable(s)
+                [variable] : compare entities across visits with/without conditions on variables
 
 
                 NOTES
-                   The variables Entity_ID and Visit (if applicable) must not be provided as args as they are already part of 
+                   The variables Entity_ID and Visit (if applicable) must not be provided as arguments as they are already part of 
                    the query-set however, both can be used to impose conditions.
 
-                   Other variables in args/cond (option) must be referenced as 'Table.Variable' or 'Visit.Table.Variable' where
+                   Other variables in arguments/cond (option) must be referenced as 'Table.Variable' or 'Visit.Table.Variable' where
                    visit can be Vany, Vlast, V1, V2, V3, etc.
 
                    The directory specified within the 'out' option must have RWX enabled for CohortExplorer.
 
-                   Conditions can be used using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in 
+                   Conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in 
                    and regexp.
 
-                   When a condition is imposed on regular variables (i.e. not visit) from dynamic tables then it is assumed that the
-                   condition applies to all visits of those variables.
+                   When conditions are imposed on variables with no prefix C<V1>, C<V2>, C<Vany> or C<Vlast>, it is assumed that the
+                   conditions apply to all visits of those variables.
 
 
                 EXAMPLES
-                   compare --out=/home/user/exports --stats --save-search --cond=V1.CER.Score="{'>','20'}" 
-                           --cond=Vlast.CER.Score="{'<=','30'}" V1.SC.Date
+                   compare --out /home/user/exports --stats --save-command --cond V1.CER.Score="{'>','20'}" V1.SC.Date
 
-                   compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V1.DIS.Status
+                   compare --out /home/user/exports --export CER --cond SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
 
-                   compare -o'/home/user/exports' -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
+                   compare -o /home/user/exports -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
 
-                   compare -o'/home/user/exports' -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
+                   compare -o /home/user/exports -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
 
              \;
 }
@@ -170,8 +169,8 @@ sub get_query_parameters {
 					}
 				}
 
-                                # When a condition is imposed on a variable (with no prefix V1, Vlast, Vany) from dynamic table(s) then
-                                # it is assumed that the condition applies to all visits of that variable (i.e. 'AND' case)
+                                # When a condition is imposed on a variable (with no prefix V1, Vlast, Vany)
+                                # assume the condition applies to all visits of that variable (i.e. 'AND' case)
 				else {
 
 					map {
@@ -400,7 +399,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query::Compare - CohortExplorer command to compare entities across visits with or without condition(s) on variable(s)
+CohortExplorer::Command::Query::Compare - CohortExplorer command to compare entities across visits with or without conditions on variables
 
 =head1 SYNOPSIS
 
@@ -470,13 +469,13 @@ The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as 
 
 =head1 EXAMPLES
 
- compare --out=/home/user/exports --stats --save-search --cond=V1.CER.Score="{'>','20'}" --cond=Vlast.CER.Score="{'<=','30'}" V1.SC.Date
+ compare --out /home/user/exports --stats --save-command --cond V1.CER.Score="{'>','20'}" V1.SC.Date
 
- compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V1.DIS.Status
+ compare --out /home/user/exports --export CER --cond SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
 
- compare -o'/home/user/exports' -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
+ compare -o /home/user/exports -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
 
- compare -o'/home/user/exports' -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
+ compare -o /home/user/exports -e CER -e SD -c Vlast.CER.Score="{'between',['25','30']}" DIS.Status
 
 =head1 DIAGNOSTICS
 

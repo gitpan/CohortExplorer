@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 use Carp;
 use Config::General;
@@ -329,7 +329,7 @@ sub new {
 	return bless $_[1], $_[0];
 }
 
-sub _set_visit_variables {
+sub set_visit_variables {
 
 	my ( $datasource ) = @_;
 
@@ -538,7 +538,7 @@ Basic constructor.
 
 =head1 PROCESSING
 
-After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. $response != undef), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
+After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. $response is defined), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
 
 =head2 set_entity_parameters( $struct )
 
@@ -556,7 +556,7 @@ This method attempts to set the information on variables and their attributes as
 
 =item a. 
 
-the resulting name also contains the name of the table, the variable was recorded under (e.g. MMSE.Total),
+the resulting name also contains the name of the table, the variable was recorded under (e.g. CaseHistory.Onset_Age),
 
 =item b.
 
@@ -566,7 +566,7 @@ distinguishes one variable from the other as sometimes variables from different 
 
 =head2 set_visit_variables()
 
-This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are valid to dynamic tables only and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|/CohortExplorer::Command::Compare> command allows the use of visit variables when searching for entities of interest.
+This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are only valid to dynamic tables and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|/CohortExplorer::Command::Query::Compare> command allows the use of visit variables when searching for entities of interest.
 
 =head1 SUBCLASS HOOKS
 
@@ -685,22 +685,6 @@ B<Note> that C<-columns> hash ref must have the key C<variable> and C<table>. Ag
 
 This method should return a hash ref with variable type as keys and equivalent SQL type (i.e. castable) as value.
 
-=head1 SECURITY
-
-When setting CohortExplorer for group usage it is advised to install the application using its debian package which is part of the release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
-
-=over
-
-=item *
-
-forcing the taint mode and,
-
-=item *
-
-disabling the access to configuration files and log file to users other than the administrator or root (user).
-
-=back
-
 =head1 DIAGNOSTICS
 
 =over
@@ -731,7 +715,7 @@ The method C<execute> from L<DBI> fails to execute the SQL query.
 
 Carp
 
-L<CLI::Framework::Exceptions>
+L<CLI::Framework>
 
 L<Config::General>
 
