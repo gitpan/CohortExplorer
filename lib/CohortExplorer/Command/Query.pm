@@ -3,10 +3,10 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.03;
+our $VERSION = 0.04;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
-my $ARG_MAX = 30;
+my $ARG_MAX = 50;
 
 #-------
 
@@ -16,18 +16,15 @@ BEGIN {
 	use CLI::Framework::Exceptions qw( :all );
 	use CohortExplorer::Datasource;
 	use Exception::Class::TryCatch;
+        use File::HomeDir;
+        use File::Spec;
 	use Config::General;
 
 	# Read command history file
-	my $username = getlogin() || getpwuid($<) || $ENV{LOGNAME} || $ENV{USER};
-	$COMMAND_HISTORY_FILE =
-	  ( $username eq 'root' ? '/root' : '/home/' . $username )
-	  . "/.CohortExplorer_History";
-
-	FileHandle->new( '>>' . $COMMAND_HISTORY_FILE )
-	  or throw_cmd_run_exception( error =>
-            "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer\n"
-	  );
+	$COMMAND_HISTORY_FILE = File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History");
+	
+	FileHandle->new( ">> $COMMAND_HISTORY_FILE" )
+	  or throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer\n" );
 
 	eval {
 		$COMMAND_HISTORY_CONFIG = Config::General->new(
@@ -161,7 +158,7 @@ sub run {
 
 	# If the result-set is not empty
 	if (@$result_set) {
-		my $dir = $opts->{out} . "/CohortExplorer_$$" . time;
+		my $dir = File::Spec->catdir( $opts->{out}, "CohortExplorer_$$" . time );
 		$dir = $1 if ( $dir =~ /^(.+)$/ );
 
 		mkdir $dir;
@@ -182,8 +179,7 @@ sub run {
 
 		return {
 			headingText => 'summary statistics',
-			rows =>
-			  $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
+			rows => $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
 		  }
 		  if ( $opts->{stats} );
 	}
@@ -230,9 +226,7 @@ sub process {
 		  map { $_ => 1 }
 		  ( '`Entity_ID`', $param->{$type}{stmt} =~ /AS\s+(\`[^\`]+\`),?/g );
 
-		my @var_placeholder =
-		  grep ( exists $vars{"`$param->{$type}{bind}->[$_]`"},
-			0 .. $#{ $param->{$type}{bind} } );
+		my @var_placeholder = grep ( exists $vars{"`$param->{$type}{bind}->[$_]`"}, 0 .. $#{ $param->{$type}{bind} } );
 
 		if (@var_placeholder) {
 
@@ -240,7 +234,7 @@ sub process {
 			for ( 0 .. $#var_placeholder ) {
 				my $count = 0;
 				$param->{$type}{stmt} =~
-s/(\?)/$count++ == $var_placeholder[$_]-$_ ? '`'.$param->{$type}{bind}->[$var_placeholder[$_]].'`' : $1/ge;
+                                s/(\?)/$count++ == $var_placeholder[$_]-$_ ? '`'.$param->{$type}{bind}->[$var_placeholder[$_]].'`' : $1/ge;
 				delete( $param->{$type}{bind}->[ $var_placeholder[$_] ] );
 			}
 			@{ $param->{$type}{bind} } = grep( $_, @{ $param->{$type}{bind} } );
@@ -356,8 +350,9 @@ sub export_data {
 	my $datasource = $cache->{datasource};
 
 	# Write query param file
-	my $fh = FileHandle->new("> $dir/QueryParameters")
-	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
+        my $file = File::Spec->catfile($dir, "QueryParameters");
+	my $fh = FileHandle->new("> $file")	  
+           or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
 	print $fh "Query Parameters" . "\n\n";
 	print $fh "Arguments supplied: " . join( ', ', @args ) . "\n\n";
@@ -466,7 +461,8 @@ sub summary_stats {
 
 	my $vars = $cache->{datasource}->variables();
 
-	my $fh = FileHandle->new("> $dir/SummaryStatistics.csv")
+        my $file = File::Spec->catfile($dir, "SummaryStatistics.csv");
+	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
 	$csv->combine(@col)
@@ -510,7 +506,7 @@ sub summary_stats {
 				eval {
 					push @row,
 					  sprintf(
-                        "N: %3s\nMean: %.2f\nMedian: %.2f\nSD: %.2f\nMax: %.2f\nMin: %.2f",
+                                                "N: %3s\nMean: %.2f\nMedian: %.2f\nSD: %.2f\nMax: %.2f\nMin: %.2f",
 						$sdf->count(), $sdf->mean(), $sdf->median(),
 						$sdf->standard_deviation(),
 						$sdf->max(), $sdf->min()
@@ -756,6 +752,10 @@ L<DBI>
 L<Exception::Class::TryCatch>
 
 L<FileHandle>
+
+L<File::HomeDir>
+
+L<File::Spec>
 
 L<SQL::Abstract::More>
 

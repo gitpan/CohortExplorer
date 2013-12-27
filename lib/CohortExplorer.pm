@@ -1,17 +1,9 @@
-#!/usr/bin/perl
-
 package CohortExplorer;
-
-use 5.006;
 
 use strict;
 use warnings;
 
-our $VERSION = 0.03;
-
-use CohortExplorer::Application;
-
-CohortExplorer::Application->run();
+our $VERSION = 0.04;
 
 #-------
 
@@ -29,7 +21,7 @@ B<CohortExplorer [OPTIONS] COMMAND [COMMAND-OPTIONS]>
 
 =head1 DESCRIPTION
 
-CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the L<datasource API|/CohortExplorer::Datasource>. CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
+CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the L<datasource API|CohortExplorer::Datasource>. CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
 
 The application makes use of the following concepts to explore clinical repositories within the EAV framework:
 
@@ -197,6 +189,8 @@ Currently the application does not support the querying of datasources with mult
 
 =head1 DEPENDENCIES
 
+Carp
+
 L<CLI::Framework>
 
 L<Config::General>
@@ -206,6 +200,10 @@ L<DBI>
 L<Exception::Class::TryCatch>
 
 L<File::Find>
+
+L<File::HomeDir>
+
+L<File::Spec>
 
 L<Log::Log4perl>
 

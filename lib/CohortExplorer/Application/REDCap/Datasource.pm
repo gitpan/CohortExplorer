@@ -173,7 +173,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::REDCap::Datasource - Class to initialise datasource stored under REDCap SQL framework ( see L<http://project-redcap.org/>)
+CohortExplorer::Application::REDCap::Datasource - Class to initialise datasource stored under L<REDCap|http://project-redcap.org/> framework
 
 =head1 SYNOPSIS
 

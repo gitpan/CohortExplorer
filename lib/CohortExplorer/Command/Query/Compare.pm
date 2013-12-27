@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.03;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -55,7 +55,7 @@ sub get_query_parameters {
 	my %param;
 
         # Extract all variables from args/cond (option) except Entity_ID and Visit as they are dealt separately
-	my @vars = grep( !/^Entity_ID|Visit$/,
+	my @vars = grep( !/^(Entity_ID|Visit)$/,
 		keys %{
 			{
 				map { $_ => 1 } map { s/^V(any|last|[0-9]+)\.//; $_ } @args,
@@ -68,11 +68,8 @@ sub get_query_parameters {
 		# Build a hash with keys 'static' and 'dynamic'
 		# Each keys contains its own sql parameters
 		my $table_type = grep ( /^$1$/, @static_tables ) ? 'static' : 'dynamic';
-		push
-		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
-		  $1;
-		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }
-			  {-in} }, $2;
+		push @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} }, $1;
+		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }{-in} }, $2;
 
 		if ( $table_type eq 'dynamic' ) {
 
@@ -102,16 +99,14 @@ sub get_query_parameters {
 
 	                # Build conditions for visit variables e.g. V1.Var, Vlast.Var, Vany.Var etc.
 	                # Values inside array references are joined as 'OR' and hashes as 'AND'
-			my @visit_vars = grep( /^(V(any|last|[0-9]+)\.$var|$var)$/,
-				keys %{ $opts->{cond} } );
+			my @visit_vars = grep( /^(V(any|last|[0-9]+)\.$var|$var)$/, keys %{ $opts->{cond} } );
 
 			for my $visit_var ( sort @visit_vars ) {
-
                                 # Last visits (i.e. Vlast) for entities are not known in advance so practically any
                                 # visit can be the last visit for any entity
 				if ( $visit_var =~ /^Vlast\.$var$/ ) {
-					my ( $opr, $val ) = ( $opts->{cond}{"Vlast.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
-					$val = !$2 ? undef : eval $2;
+				     my ( $opr, $val ) = ( $opts->{cond}{"Vlast.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
+					  $val = !$2 ? undef : eval $2;
 
 					if ( defined $param{$table_type}{-having}{-or} ) {
 						map {
@@ -261,10 +256,12 @@ sub process_result_set {
 	my @last_visit_vars =
 	  grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) );
 
-	# The entities output by the query are stored within a list
+	# The entities from the query are stored within a list
 	my @result_entity;
 
-	my $fh = FileHandle->new("> $dir/QueryOutput.csv")
+        my $file = File::Spec->catfile($dir, "QueryOutput.csv");
+
+	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 	$csv->combine( ( @vars, @last_visit_vars ) )
 	  ? print $fh $csv->string() . "\n"
@@ -339,7 +336,7 @@ sub process_table {
 	}
 
 	# Write table data
-	my $file      = "$dir/$table.csv";
+	my $file      = File::Spec->catfile($dir, "$table.csv");
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
 	my $fh        = FileHandle->new("> $untainted")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );

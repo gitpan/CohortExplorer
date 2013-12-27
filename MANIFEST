@@ -1,10 +1,9 @@
-Makefile.PL
-MANIFEST
-README
 Changes
+config_files/datasource-config.properties
+config_files/log-config.properties
+debian/cohortexplorer_0.04-1_all.deb
 lib/CohortExplorer.pm
 lib/CohortExplorer/Application.pm
-lib/CohortExplorer/Datasource.pm
 lib/CohortExplorer/Application/Opal/Datasource.pm
 lib/CohortExplorer/Application/REDCap/Datasource.pm
 lib/CohortExplorer/Command/Describe.pm
@@ -13,13 +12,15 @@ lib/CohortExplorer/Command/Help.pm
 lib/CohortExplorer/Command/History.pm
 lib/CohortExplorer/Command/Menu.pm
 lib/CohortExplorer/Command/Query.pm
-lib/CohortExplorer/Command/Query/Search.pm
 lib/CohortExplorer/Command/Query/Compare.pm
+lib/CohortExplorer/Command/Query/Search.pm
+lib/CohortExplorer/Datasource.pm
+Makefile.PL
+MANIFEST			This list of files
+META.yml
+README
 t/00-load.t
+t/boilerplate.t
 t/manifest.t
 t/pod-coverage.t
 t/pod.t
-debian/cohortexplorer_0.03-1_all.deb
-config_files/datasource-config.properties
-config_files/log-config.properties
-META.yml

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -50,8 +50,7 @@ sub get_query_parameters {
 	my @static_tables   = @{ $datasource->static_tables() || [] };
 	my $struct          = $datasource->entity_structure();
 	my %param;
-	my @vars_in_condition =
-	  grep ( !/^(Entity_ID|Visit)$/, keys %{ $opts->{cond} } );
+	my @vars_in_condition = grep ( !/^(Entity_ID|Visit)$/, keys %{ $opts->{cond} } );
 	
 	my %args = map { $_ => 1 } @args;
 	my @vars = ( @args, grep { !$args{$_} } @vars_in_condition );
@@ -67,12 +66,9 @@ sub get_query_parameters {
                 # Each key contains its own SQL parameters
                 # In static tables the rows are grouped on Entity_ID where as in dynamic tables
                 # (i.e. longitudinal datasources) the rows are grouped on Entity_ID and Visit
-                push
-		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
-		  $1;
-
-		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }
-			  {-in} }, $2;
+                push @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} }, $1;
+                
+                push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }{-in} }, $2;
 		push @{ $param{$table_type}{-columns} },
 		    " CAST( GROUP_CONCAT( "
 		  . ( $table_type eq 'static' ? 'DISTINCT' : '' )
@@ -138,7 +134,8 @@ sub process_result_set {
 	my %result_entity;
 
 	# Write result set
-	my $fh = FileHandle->new("> $dir/QueryOutput.csv")
+        my $file = File::Spec->catfile($dir, "QueryOutput.csv");
+	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
 	# Returns hash ref to hash with key as entity_id and value either:
@@ -192,7 +189,7 @@ sub process_table {
 	}
 
 	# Add Visit column to the header if the table is dynamic
-	my $file      = "$dir/$table.csv";
+	my $file = File::Spec->catfile($dir, "$table.csv");
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
 	my $fh        = FileHandle->new("> $untainted")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );

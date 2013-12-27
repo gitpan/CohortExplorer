@@ -239,7 +239,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::Opal::Datasource - Class to initialise datasource stored under Opal SQL framework ( see L<http://obiba.org/node/63>)
+CohortExplorer::Application::Opal::Datasource - Class to initialise datasource stored under L<Opal (OBiBa)|http://obiba.org/node/63> SQL framework
 
 =head1 SYNOPSIS
 
@@ -259,7 +259,7 @@ This method returns a hash ref containing all default parameters. By default,
 
 =head2 entity_structure()
 
-This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the entity_id and visit number on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The C<id_visit_separator> can also be a string (e.g. PARTIOP1, PARTIOP2).
+This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the C<entity_id> and C<visit> on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The C<id_visit_separator> can also be a string (e.g. PARTIOP1, PARTIOP2).
 
 =head2 table_structure()
 

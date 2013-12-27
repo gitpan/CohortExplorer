@@ -3,16 +3,10 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.03;
+our $VERSION = 0.04;
 
 # Directory list for command-line completion
 my @DIRS;
-
-# Path to log configuration file
-my $LOG_CONFIG_FILE = "/etc/CohortExplorer/log-config.properties";
-
-# Path to datasource configuration file
-my $DATASOURCE_CONFIG_FILE = "/etc/CohortExplorer/datasource-config.properties";
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -71,7 +65,7 @@ sub validate_options {
 	my ( $app, $opts ) = @_;
 
 	# Show help and exit ...
-	if ( $opts->{help} ) {
+	if ( $opts->{help} || keys %$opts == 0 ) {
 	     $app->render( $app->get_default_usage() );
 	     exit;
 	}
@@ -153,7 +147,7 @@ sub render {
 
 		my @cols = @{ shift @{ $output->{rows} } };
 
-		# Format table based on the command output
+		# Format table on the basis of command output
 		my $colWidth = $output->{headingText} eq 'command history' ? 1000 : 30;
 
 		$table->setCols(@cols);
@@ -171,14 +165,19 @@ sub render {
 			$table->addRow(@row);
 		}
 
-		delete @ENV{qw(PATH)};
-		$ENV{PATH} = "/usr/bin:/bin";
-		my $path = $ENV{'PATH'};
+                if ( $^O eq 'linux' ) {
+                     delete @ENV{qw(PATH)};
+		     $ENV{PATH} = "/usr/bin:/bin";
+		     my $path = $ENV{'PATH'};
 
-		open( my $less, '|-', $ENV{PAGER} || 'less', '-e' )
-		  or croak "Failed to pipe to pager: $!\n";
-		print $less "\n" . $table . "\n";
-		close($less);
+		     open( my $less, '|-', $ENV{PAGER} || 'less', '-e' ) or croak "Failed to pipe to pager: $!\n";
+		     print $less "\n" . $table . "\n";
+		     close($less);
+                }
+
+                else {
+                       print "\n". $table . "\n";
+                }
 	}
 
 	else {
@@ -376,8 +375,11 @@ sub init {
 
 	require Log::Log4perl;
 
+        # Path to log configuration file
+        my $log_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'log-config.properties');
+
 	# Initialise logger
-	eval { Log::Log4perl::init($LOG_CONFIG_FILE); };
+	eval { Log::Log4perl::init($log_config_file); };
 
 	if ( catch my $e ) {
 	     throw_app_init_exception( error => $e );
@@ -401,13 +403,16 @@ sub init {
 
 	chomp $opts->{password};
 
+        # Path to datasource configuration file
+        my $datasource_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'datasource-config.properties');
+
 	# Initialise the datasource and store in cache for further use
 	$app->cache->set(
 		cache => {
 			verbose    => $opts->{verbose},
 			user       => $opts->{username} . '@' . $opts->{datasource},
 			logger     => $logger,
-			datasource => CohortExplorer::Datasource->initialise( $opts, $DATASOURCE_CONFIG_FILE )
+			datasource => CohortExplorer::Datasource->initialise( $opts, $datasource_config_file )
 		}
 	);
 
@@ -417,29 +422,25 @@ sub init {
                 # 'out' option's commmand-line completion
 		if ( !grep( $_ eq 'search', $app->noninteractive_commands() ) ) {
 
-	                # If the user is root get all subdirectories under /root, otherwise $HOME
+	                # Get all subdirectories under user's home directory
 			no warnings 'File::Find';
+                        require File::HomeDir;
 
-			my $username =
-			     getlogin()
-			  || getpwuid($<)
-			  || $ENV{LOGNAME}
-			  || $ENV{USER};
-			eval {
-			      finddepth(
+                         eval {
+			      find(
 					{
 						wanted => sub {
-							        push @DIRS, $_ if (-d);
+							        push @DIRS, $_ if ( -d );
 						},
 						untaint  => 1,
 						no_chdir => 1
 					},
-					$username eq 'root' ? '/root' : '/home/' . $username
+					File::HomeDir->my_home()
 				);
 			};
 
 			if ( catch my $e ) {
-				throw_app_init_exception( error => $e );
+			     throw_app_init_exception( error => $e );
 			}
 		}
 
@@ -583,6 +584,8 @@ L<CLI::Framework::Exceptions>
 L<Exception::Class::TryCatch>
 
 L<File::Find>
+
+L<File::HomeDir>
 
 L<Log::Log4perl>
 

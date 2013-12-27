@@ -538,7 +538,7 @@ Basic constructor.
 
 =head1 PROCESSING
 
-After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. $response is defined), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
+After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. a defined <$response>), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
 
 =head2 set_entity_parameters( $struct )
 
@@ -566,7 +566,7 @@ distinguishes one variable from the other as sometimes variables from different 
 
 =head2 set_visit_variables()
 
-This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are only valid to dynamic tables and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|/CohortExplorer::Command::Query::Compare> command allows the use of visit variables when searching for entities of interest.
+This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are only valid to dynamic tables and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|CohortExplorer::Command::Query::Compare> command allows the use of visit variables when searching for entities of interest.
 
 =head1 SUBCLASS HOOKS
 
@@ -715,7 +715,7 @@ The method C<execute> from L<DBI> fails to execute the SQL query.
 
 Carp
 
-L<CLI::Framework>
+L<CLI::Framework::Exceptions>
 
 L<Config::General>
 
