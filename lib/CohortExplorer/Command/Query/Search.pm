@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.05;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -260,7 +260,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query::Search - CohortExplorer class to search entities with or without conditions on variables
+CohortExplorer::Command::Query::Search - CohortExplorer class to search entities
 
 =head1 SYNOPSIS
 

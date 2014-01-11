@@ -393,7 +393,7 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
 
 =head1 SYNOPSIS
 
-    # The code below shows methods your datasource class overrides;
+    # The code below shows methods your datasource class overrides
 
     package CohortExplorer::Application::REDCap::Datasource;
     use base qw( CohortExplorer::Datasource );
@@ -538,7 +538,7 @@ Basic constructor.
 
 =head1 PROCESSING
 
-After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. a defined <$response>), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
+After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. a defined C<$response>), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
 
 =head2 set_entity_parameters( $struct )
 
@@ -713,7 +713,7 @@ The method C<execute> from L<DBI> fails to execute the SQL query.
 
 =head1 DEPENDENCIES
 
-Carp
+L<Carp>
 
 L<CLI::Framework::Exceptions>
 

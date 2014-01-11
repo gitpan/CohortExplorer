@@ -3,7 +3,7 @@ package CohortExplorer;
 use strict;
 use warnings;
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
 
 #-------
 
@@ -189,7 +189,7 @@ Currently the application does not support the querying of datasources with mult
 
 =head1 DEPENDENCIES
 
-Carp
+L<Carp>
 
 L<CLI::Framework>
 

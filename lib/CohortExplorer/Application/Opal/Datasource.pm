@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.05;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -208,9 +208,6 @@ sub variable_structure {
 		-where => {
 			'vt.entity_type' => $self->entity_type(),
 			'ds.name'        => $datasource_name,
-			'varatt.name'    => {
-				-in => [qw/questionnaire description stage label info source/]
-			},
 			%acl
 		},
 		-group_by => 'var.id',
@@ -239,7 +236,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::Opal::Datasource - Class to initialise datasource stored under L<Opal (OBiBa)|http://obiba.org/node/63> SQL framework
+CohortExplorer::Application::Opal::Datasource - CohortExplorer class to initialise datasource stored under L<Opal (OBiBa)|http://obiba.org/node/63> SQL framework
 
 =head1 SYNOPSIS
 

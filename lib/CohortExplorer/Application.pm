@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
 
 # Directory list for command-line completion
 my @DIRS;
@@ -376,7 +376,7 @@ sub init {
 	require Log::Log4perl;
 
         # Path to log configuration file
-        my $log_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'log-config.properties');
+        my $log_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'CohortExplorer', 'log-config.properties');
 
 	# Initialise logger
 	eval { Log::Log4perl::init($log_config_file); };
@@ -404,7 +404,7 @@ sub init {
 	chomp $opts->{password};
 
         # Path to datasource configuration file
-        my $datasource_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'datasource-config.properties');
+        my $datasource_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'CohortExplorer', 'datasource-config.properties');
 
 	# Initialise the datasource and store in cache for further use
 	$app->cache->set(
@@ -575,7 +575,7 @@ All exceptions thrown within CohortExplorer are treated by C<handle_exception( $
  
 =head1 DEPENDENCIES
 
-Carp
+L<Carp>
 
 L<CLI::Framework::Application>
 

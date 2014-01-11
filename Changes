@@ -2,15 +2,15 @@ Revision history for CohortExplorer
 
 0.01    2013-12-06
 
-        Initial release.
+        - Initial release
 
 0.02    2013-12-09
 
-        Documentation corrections and minor code changes
+        - Documentation corrections and minor code changes
 
 0.03    2013-12-15
 
-        * Fixed some broken links within the documentation and improved the command-line completion.
+        - Fixed some broken links within the documentation and improved the command-line completion.
           The application now allows the auto-completion of options and their values. For a given commmand 
           all possible options can be seen by typing the command name followed by '--' and pressing the tab key. 
           The user is also able to see all possible values the options can take by pressing the tab key after 
@@ -18,4 +18,9 @@ Revision history for CohortExplorer
 
 0.04   2013-12-27
        
-       * Improved platform independence by employing File::Spec. 
+        - Improved platform independence by employing File::Spec.
+
+0.05   2014-01-11
+
+        - Minor code changes
+         

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Menu;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.05;
 
 use base qw( CLI::Framework::Command::Menu );
 
@@ -41,7 +41,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Menu - CohortExplorer command to show a command menu
+CohortExplorer::Command::Menu - CohortExplorer class to show a command menu
 
 =head1 DESCRIPTION
 

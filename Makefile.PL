@@ -28,7 +28,7 @@ WriteMakefile(
 		'SQL::Abstract::More'        => 1.17,
 		'Statistics::Descriptive'    => 3.0203,
 		'Text::CSV_XS'               => 1.01,
-		'Text::ASCIITable'           => 0.02,
+		'Text::ASCIITable'           => 0.20,
 		'Time::HiRes'                => 0,
 		'Tie::IxHash'                => 1.21,
 		'Term::ReadKey'              => 2.14,

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.03;
+our $VERSION = 0.05;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -396,7 +396,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query::Compare - CohortExplorer command to compare entities across visits with or without conditions on variables
+CohortExplorer::Command::Query::Compare - CohortExplorer command to compare entities across visits
 
 =head1 SYNOPSIS
 

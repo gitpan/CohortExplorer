@@ -35,11 +35,11 @@ requires:
   Statistics::Descriptive: 3.0203
   Term::ReadKey: 2.14
   Test::More: 0
-  Text::ASCIITable: 0.02
+  Text::ASCIITable: 0.20
   Text::CSV_XS: 1.01
   Tie::IxHash: 1.21
   Time::HiRes: 0
   perl: 5.010
 resources:
    license: http://dev.perl.org/licenses/
-version: 0.04
+version: 0.05

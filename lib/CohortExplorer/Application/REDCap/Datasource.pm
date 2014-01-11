@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.05;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -173,7 +173,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::REDCap::Datasource - Class to initialise datasource stored under L<REDCap|http://project-redcap.org/> framework
+CohortExplorer::Application::REDCap::Datasource - CohortExplorer class to initialise datasource stored under L<REDCap|http://project-redcap.org/> framework
 
 =head1 SYNOPSIS
 

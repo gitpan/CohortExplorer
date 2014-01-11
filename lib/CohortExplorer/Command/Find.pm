@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.02;
+our $VERSION = 0.05;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );

@@ -3,7 +3,16 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.04;
+our $VERSION = 0.05;
+
+use base qw(CLI::Framework::Command Exporter);
+use CLI::Framework::Exceptions qw( :all );
+use CohortExplorer::Datasource;
+use Exception::Class::TryCatch;
+use File::HomeDir;
+use File::Spec;
+use Config::General;
+
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 50;
@@ -11,17 +20,10 @@ my $ARG_MAX = 50;
 #-------
 
 BEGIN {
-
-	use base qw(CLI::Framework::Command Exporter);
-	use CLI::Framework::Exceptions qw( :all );
-	use CohortExplorer::Datasource;
-	use Exception::Class::TryCatch;
-        use File::HomeDir;
-        use File::Spec;
-	use Config::General;
-
 	# Read command history file
-	$COMMAND_HISTORY_FILE = File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History");
+	File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History") =~ /^(.+)$/;
+
+        $COMMAND_HISTORY_FILE = $1;
 	
 	FileHandle->new( ">> $COMMAND_HISTORY_FILE" )
 	  or throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer\n" );
@@ -598,7 +600,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query - CohortExplorer class is an interface to search and compare command classes
+CohortExplorer::Command::Query - CohortExplorer abstract class to search and compare command classes
 
 =head1 DESCRIPTION
 

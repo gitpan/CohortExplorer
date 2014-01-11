@@ -4,7 +4,7 @@ use base qw( CLI::Framework::Command::Meta );
 use strict;
 use warnings;
 
-our $VERSION = 0.01;
+our $VERSION = 0.05;
 
 #-------
 
@@ -75,7 +75,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Help - CohortExplorer command to show application or command specific usage
+CohortExplorer::Command::Help - CohortExplorer class to show application or command specific usage
 
 =head1 DESCRIPTION
 
