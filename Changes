@@ -23,4 +23,9 @@ Revision history for CohortExplorer
 0.05   2014-01-11
 
         - Minor code changes
+
+0.06   2014-01-13
+
+        - The application now throws an exception if the command history file does not exist. The application requires
+          the command history file to exist with RW enabled for CohortExplorer.
          

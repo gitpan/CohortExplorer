@@ -2,7 +2,7 @@ CohortExplorer
 
 INSTALLATION
 
-sudo dpkg -i debian/cohortexplorer_0.05-1_all.deb
+sudo dpkg -i debian/cohortexplorer_0.06-1_all.deb
 
 To install dependencies type,
 sudo apt-get install -f
@@ -11,7 +11,7 @@ Or, install
 sudo apt-get install gdebi
 
 and then,
-sudo gdebi debian/cohortexplorer_0.05-1_all.deb
+sudo gdebi debian/cohortexplorer_0.06-1_all.deb
 
 After the installation, the datasources can be configured by following the instructions in /etc/CohortExplorer/datasource-config.properties.
 

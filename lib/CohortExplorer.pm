@@ -3,7 +3,7 @@ package CohortExplorer;
 use strict;
 use warnings;
 
-our $VERSION = 0.05;
+our $VERSION = 0.06;
 
 #-------
 
@@ -161,7 +161,7 @@ This command enables the user to see the history of saved commands. The user can
 
 =head1 EXAMPLES
 
- [somebody@somewhere]$ CohortExplorer --datasource Clinical --username administrator --password describe (run describe command)
+ [somebody@somewhere]$ CohortExplorer --datasource=Clinical --username=administrator --password=describe (run describe command)
 
  [somebody@somewhere]$ CohortExplorer -v -d Clinical -u administrator -p console (start console in verbose mode)
    

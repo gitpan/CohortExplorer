@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.05;
+our $VERSION = 0.06;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -34,9 +34,9 @@ sub usage_text {    # Command is only available to longitudinal datasources
 
 
                 EXAMPLES
-                   compare --out /home/user/exports --stats --save-command --cond V1.CER.Score="{'>','20'}" V1.SC.Date
+                   compare --out=/home/user/exports --stats --save-command --cond=V1.CER.Score="{'>','20'}" V1.SC.Date
 
-                   compare --out /home/user/exports --export CER --cond SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
+                   compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
 
                    compare -o /home/user/exports -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
 
@@ -466,9 +466,9 @@ The variables C<Entity_ID> and C<Visit> (if applicable) must not be provided as 
 
 =head1 EXAMPLES
 
- compare --out /home/user/exports --stats --save-command --cond V1.CER.Score="{'>','20'}" V1.SC.Date
+ compare --out=/home/user/exports --stats --save-command --cond=V1.CER.Score="{'>','20'}" V1.SC.Date
 
- compare --out /home/user/exports --export CER --cond SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
+ compare --out=/home/user/exports --export=CER --cond=SD.Subject_Sex="{'=','Male'}" V1.CER.Score V3.DIS.Status
 
  compare -o /home/user/exports -Ssa -c Vlast.CER.Score="{'in',['25','30','40']}" DIS.Status 
 

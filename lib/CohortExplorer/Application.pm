@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.05;
+our $VERSION = 0.06;
 
 # Directory list for command-line completion
 my @DIRS;
@@ -240,7 +240,7 @@ sub read_cmd {
 
 		# Arrange for command-line completion
 		my $attribs = $term->Attribs;
-		$attribs->ornaments(0);
+		$term->ornaments(0);
 		$attribs->{completion_function} = $app->_cmd_request_completions();
 	}
 
@@ -374,6 +374,8 @@ sub init {
 	my ( $app, $opts ) = @_;
 
 	require Log::Log4perl;
+        require File::Spec;
+        require File::HomeDir;
 
         # Path to log configuration file
         my $log_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'CohortExplorer', 'log-config.properties');
@@ -386,6 +388,13 @@ sub init {
 	}
 
 	my $logger = Log::Log4perl->get_logger();
+
+        # Check command history file
+        my $command_history_file = File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History");
+
+        if (!-r $command_history_file || !-w $command_history_file) {
+            throw_app_init_exception( error => "Make sure $command_history_file exists with RW enabled for CohortExplorer");
+        }
 
 	# Prompt for password if not provided at command line
 	unless ( $opts->{password} ) {

@@ -3,16 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.05;
-
-use base qw(CLI::Framework::Command Exporter);
-use CLI::Framework::Exceptions qw( :all );
-use CohortExplorer::Datasource;
-use Exception::Class::TryCatch;
-use File::HomeDir;
-use File::Spec;
-use Config::General;
-
+our $VERSION = 0.06;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 50;
@@ -20,13 +11,19 @@ my $ARG_MAX = 50;
 #-------
 
 BEGIN {
-	# Read command history file
-	File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History") =~ /^(.+)$/;
+        use base qw(CLI::Framework::Command Exporter);
+        use CLI::Framework::Exceptions qw( :all );
+        use CohortExplorer::Datasource;
+        use Exception::Class::TryCatch;
+        use File::HomeDir;
+        use File::Spec;
+        use Config::General;
 
-        $COMMAND_HISTORY_FILE = $1;
+	$COMMAND_HISTORY_FILE = $1 if ( File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History") =~ /^(.+)$/ );
 	
-	FileHandle->new( ">> $COMMAND_HISTORY_FILE" )
-	  or throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer\n" );
+	my $fh = FileHandle->new( ">> $COMMAND_HISTORY_FILE" );
+        throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer" ) unless ($fh);
+        $fh->close();
 
 	eval {
 		$COMMAND_HISTORY_CONFIG = Config::General->new(
@@ -160,10 +157,7 @@ sub run {
 
 	# If the result-set is not empty
 	if (@$result_set) {
-		my $dir = File::Spec->catdir( $opts->{out}, "CohortExplorer_$$" . time );
-		$dir = $1 if ( $dir =~ /^(.+)$/ );
-
-		mkdir $dir;
+		my $dir = $1 if ( $opts->{out} =~ /^(.+)$/ );
 
 		require Text::CSV_XS;
 
@@ -312,19 +306,19 @@ sub save_command {
 	# Construct the command run by the user and store it in $COMMAND_HISTORY
 	for my $opt ( keys %$opts ) {
 		if ( ref $opts->{$opt} eq 'ARRAY' ) {
-			$command .= " --$opt " . join( " --$opt ", @{ $opts->{$opt} } );
+			$command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
 		}
 		elsif ( ref $opts->{$opt} eq 'HASH' ) {
 			$command .= join(
 				' ',
-				map ( "--$opt $_=\"$opts->{$opt}{$_}\" ",
+				map ( "--$opt=$_=\"$opts->{$opt}{$_}\" ",
 					keys %{ $opts->{$opt} } )
 			);
 		}
 		else {
 			( $_ = $opt ) =~ s/_/-/g;
-			$command .= " --$_ $opts->{$opt} ";
-			$command =~ s/($_) 1/$1/;
+			$command .= " --$_=$opts->{$opt} ";
+			$command =~ s/($_)=1/$1/ if ( $opts->{export_all} || $opts->{stats} );
 
 			# Remove the 'save-command' option from the command
 			$command =~ s/--save-command/ /;
@@ -581,8 +575,7 @@ sub get_stats_data { }
 END {
         # Write saved commands to command history file
 	eval {
-		$COMMAND_HISTORY_CONFIG->save_file( $COMMAND_HISTORY_FILE,
-			$COMMAND_HISTORY );
+		$COMMAND_HISTORY_CONFIG->save_file( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY );
 	};
 
 	if ( catch my $e ) {
