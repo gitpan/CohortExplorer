@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 
 use Carp;
 use Config::General;
@@ -498,7 +498,7 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
 
 =head2 initialise( $opts, $config_file )
 
-CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C</etc/CohortExplorer/datasource-config.properties>) to instantiate the datasource object. The config file takes the format below,
+CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C<datasource-config.properties>) to instantiate the datasource object. The config file takes the format below,
 
         <datasource Clinical> 
          namespace=Opal

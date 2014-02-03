@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -99,7 +99,7 @@ sub run {
 
     if (@rows) {
 
-        print STDERR "Found $#rows variable(s) matching the query criteria ..."
+        print STDERR "Found $#rows variable(s) matching the find query criteria ..."
           . "\n\n"
           . "Rendering variable description ..." . "\n\n"
           if ($verbose);
@@ -111,7 +111,7 @@ sub run {
     }
 
     else {
-        print STDERR "Found 0 variable(s) matching the query criteria ..."
+        print STDERR "Found 0 variable(s) matching the find query criteria ..."
           . "\n\n"
           if ($verbose);
 

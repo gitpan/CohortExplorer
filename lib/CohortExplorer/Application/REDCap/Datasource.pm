@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;

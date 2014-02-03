@@ -28,4 +28,11 @@ Revision history for CohortExplorer
 
         - The application now throws an exception if the command history file does not exist. The application requires
           the command history file to exist with RW enabled for CohortExplorer.
+
+0.07   2014-02-03
+
+        - Fixed bug related to supplying of duplicate arguments in search and compare commands
+
+        - Fixed inconsistency in the validation of variables present in arguments and condition option
+
          

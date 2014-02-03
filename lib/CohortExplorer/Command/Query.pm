@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 50;
@@ -15,6 +15,7 @@ BEGIN {
         use CLI::Framework::Exceptions qw( :all );
         use CohortExplorer::Datasource;
         use Exception::Class::TryCatch;
+        use FileHandle;
         use File::HomeDir;
         use File::Spec;
         use Config::General;
@@ -22,7 +23,7 @@ BEGIN {
 	$COMMAND_HISTORY_FILE = $1 if ( File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History") =~ /^(.+)$/ );
 	
 	my $fh = FileHandle->new( ">> $COMMAND_HISTORY_FILE" );
-        throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled for CohortExplorer" ) unless ($fh);
+        throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled (i.e. chmod 766) for CohortExplorer" ) unless ($fh);
         $fh->close();
 
 	eval {
@@ -46,12 +47,12 @@ sub option_spec {
 
 	(
 		[],
-		[ 'cond|c=s%'      => 'impose conditions'                           ],
-		[ 'out|o=s'        => 'provide output directory', { required => 1 } ],
-		[ 'save-command|s' => 'save command'                                ],
-		[ 'stats|S'        => 'show summary statistics'                     ],
-		[ 'export|e=s@'    => 'export tables by name'                       ],
-		[ 'export-all|a'   => 'export all tables'                           ],
+		[ 'cond|c=s%'      => 'impose conditions'         ],
+		[ 'out|o:s'        => 'provide output directory'  ],
+		[ 'save-command|s' => 'save command'              ],
+		[ 'stats|S'        => 'show summary statistics'   ],
+		[ 'export|e=s@'    => 'export tables by name'     ],
+		[ 'export-all|a'   => 'export all tables'         ],
 		[]
 	);
 }
@@ -68,17 +69,20 @@ sub validate {
 	  if ( $cache->{verbose} );
 
 	# --- VALIDATE ARG LENGTH, EXPORT AND OUT OPTIONS ---
-
-	throw_cmd_validation_exception(
+        throw_cmd_validation_exception(
 		error => "At least 1-$ARG_MAX variable(s) are required" )
 	  unless ( @args && @args <= $ARG_MAX );
 
+        throw_cmd_validation_exception(
+		error => "Option 'out' (i.e. output directory) is missing" )
+	  unless ( $opts->{out} );
+
 	throw_cmd_validation_exception(
-		error => "Make sure '$opts->{out}' exists with RWX enabled" )
+		error => "Make sure '$opts->{out}' exists with RWX enabled (i.e. chmod 777) for CohortExplorer" )
 	  unless ( -d $opts->{out} && -w $opts->{out} );
 
 	throw_cmd_validation_exception( error =>
-                "Specified mutually exclusive options (export and export-all) together"
+                "Mutually exclusive options (export and export-all) specified together"
 	) if ( $opts->{export} && $opts->{export_all} );
 
 	my $datasource = $cache->{datasource};
@@ -98,20 +102,14 @@ sub validate {
 
 	# --- VALIDATE CONDITION OPTION AND ARGS ---
 
-	my @vars = (
-		keys %{ $datasource->variables() },
-		$datasource->type() eq 'standard'
-		? qw(Entity_ID)
-		: ( qw(Entity_ID Visit), @{ $datasource->visit_variables() || [] } )
-	);
+	my @vars = @{ $self->get_validation_variables() };
 
 	for my $var (@args) {
-		throw_cmd_validation_exception( error =>
-                      "Entity_ID and Visit (if applicable) are already part of the query set"
+		throw_cmd_validation_exception( error => 
+                 "Entity_ID and Visit (if applicable) are already part of the query set"
 		) if ( $var =~ /^(Entity_ID|Visit)$/ );
 
-		throw_cmd_validation_exception(
-			error => "Invalid variable '$var' in arguments" )
+		throw_cmd_validation_exception( error => "Invalid variable '$var' in arguments" )
 		  unless ( grep( /^$var$/, @vars ) );
 	}
 
@@ -168,7 +166,8 @@ sub run {
 				'escape_char' => '"',
 				'sep_char'    => ',',
 				'binary'      => 1,
-				'auto_diag'   => 1
+				'auto_diag'   => 1,
+                                'eol'         => $/
 			}
 		);
 		$self->export_data( $opts, $cache, $result_set, $dir, $csv, @args );
@@ -218,22 +217,19 @@ sub process {
 
 		require Tie::IxHash;    # May or may not be preloaded
 
-		tie my %vars, 'Tie::IxHash',
-		  map { $_ => 1 }
-		  ( '`Entity_ID`', $param->{$type}{stmt} =~ /AS\s+(\`[^\`]+\`),?/g );
+		tie my %vars, 'Tie::IxHash', map { $_ => 1 } ( '`Entity_ID`', $param->{$type}{stmt} =~ /AS\s+(\`[^\`]+\`),?/g );
 
-		my @var_placeholder = grep ( exists $vars{"`$param->{$type}{bind}->[$_]`"}, 0 .. $#{ $param->{$type}{bind} } );
-
-		if (@var_placeholder) {
-
-			# No variables in placeholders as they need to be hard coded
-			for ( 0 .. $#var_placeholder ) {
+                my @quoted_bind = map { s/\'//g; "`$_`" } @{$param->{$type}{bind} };
+                my @var_placeholder = grep ( defined $vars{$quoted_bind[$_]}, 0 .. $#quoted_bind );
+                
+                if (@var_placeholder) {
+                     # No variables in placeholders as they need to be hard coded
+		     for ( 0 .. $#var_placeholder ) {
 				my $count = 0;
-				$param->{$type}{stmt} =~
-                                s/(\?)/$count++ == $var_placeholder[$_]-$_ ? '`'.$param->{$type}{bind}->[$var_placeholder[$_]].'`' : $1/ge;
+                                $param->{$type}{stmt} =~ s/(\?)/$count++ == $var_placeholder[$_]-$_ ? $quoted_bind[$var_placeholder[$_]] : $1/ge;
 				delete( $param->{$type}{bind}->[ $var_placeholder[$_] ] );
-			}
-			@{ $param->{$type}{bind} } = grep( $_, @{ $param->{$type}{bind} } );
+		      }
+		      @{ $param->{$type}{bind} } = grep( defined($_), @{ $param->{$type}{bind} } );
 		}
 
 		delete $vars{'`Entity_ID`'};
@@ -244,16 +240,18 @@ sub process {
 		$stmt = $param->{ ( keys %$param )[0] }{stmt};
 	}
 
-	else {    # both static and dynamic parameters are present
+	else {  # both static and dynamic parameters are present
 
                 # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
                 # Inner join is done when conditions are imposed on static tables alone
-		$stmt =
+                $stmt =
 		    'SELECT dynamic.Entity_ID, '
 		  . join( ', ', map { @{ $var->{$_} } } keys %$var )
 		  . ' FROM '
 		  . join(
-			( $param->{dynamic}{cond} ? ' INNER JOIN ' : ' LEFT OUTER JOIN ' ),
+			  ( ( ( !$param->{static}{-having}{Entity_ID} && keys % { $param->{static}{-having} } == 1) 
+                               || keys % { $param->{static}{-having} } > 1 
+                             )  ? ' INNER JOIN ' : ' LEFT OUTER JOIN '),
 			map { "( " . $param->{$_}{stmt} . " ) AS $_" } keys %$param
 		  ) . ' ON dynamic.Entity_ID = static.Entity_ID';
 	}
@@ -280,10 +278,10 @@ sub process {
 
 	my $timeEnd = Time::HiRes::time();
 
-	printf(
-       "Found %d rows in %.2f sec matching the $command query criteria ...\n\n",
-		$sth->rows() || 0,
-		$timeEnd - $timeStart
+	printf( "Found %d rows in %.2f sec matching the %s query criteria ...\n\n",
+		($sth->rows() || 0),
+		($timeEnd - $timeStart),
+                 $command
 	) if ( $cache->{verbose} );
 
 	push @rows, ( $sth->{NAME}, @{ $sth->fetchall_arrayref( [] ) } )
@@ -297,16 +295,19 @@ sub save_command {
 	my ( $self, $opts, $cache, @args ) = @_;
 	my $alias = $cache->{datasource}->alias();
 	my $count = scalar keys %{ $COMMAND_HISTORY->{datasource}{$alias} };
-	( my $command = lc ref $self ) =~ s/^.+:://;
+      ( my $command = lc ref $self ) =~ s/^.+:://;
 
 	print STDERR "Saving command ..." . "\n\n" if ( $cache->{verbose} );
 
 	require POSIX;
 
+        # Remove the save-command option
+        delete $opts->{save_command};
+
 	# Construct the command run by the user and store it in $COMMAND_HISTORY
 	for my $opt ( keys %$opts ) {
 		if ( ref $opts->{$opt} eq 'ARRAY' ) {
-			$command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
+			 $command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
 		}
 		elsif ( ref $opts->{$opt} eq 'HASH' ) {
 			$command .= join(
@@ -319,9 +320,6 @@ sub save_command {
 			( $_ = $opt ) =~ s/_/-/g;
 			$command .= " --$_=$opts->{$opt} ";
 			$command =~ s/($_)=1/$1/ if ( $opts->{export_all} || $opts->{stats} );
-
-			# Remove the 'save-command' option from the command
-			$command =~ s/--save-command/ /;
 		}
 	}
 
@@ -330,7 +328,7 @@ sub save_command {
 	$command =~ s/\s+/ /g;
 
 	for ( keys %{ $COMMAND_HISTORY->{datasource} } ) {
-		$COMMAND_HISTORY->{datasource}{$_}{ ++$count } = {
+		  $COMMAND_HISTORY->{datasource}{$_}{ ++$count } = {
 			datetime => POSIX::strftime( '%d/%m/%Y %T', localtime ),
 			command  => $command
 		  }
@@ -363,7 +361,7 @@ sub export_data {
 	}
 	print $fh "\n"
 	  . "Tables exported: "
-	  . ( $opts->{export} ? join ', ', @{ $opts->{export} } : 'None' );
+	  . ( $opts->{export} ? join ', ', @{ $opts->{export} } : 'None' ). "\n";
 
 	$fh->close();
 
@@ -453,7 +451,7 @@ sub summary_stats {
 
 	# Prepare data for computing summary statistics from the result set
 
-	my ( $data, $key_index, @col ) = $self->get_stats_data($result_set);
+	my ( $data, $key_index, @cols ) = $self->get_stats_data($result_set);
 
 	my $vars = $cache->{datasource}->variables();
 
@@ -461,21 +459,18 @@ sub summary_stats {
 	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
-	$csv->combine(@col)
-	  ? print $fh $csv->string() . "\n"
-	  : throw_cmd_run_exception( error => $csv->error_input() );
+	$csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
 
-	push my @summary_stats, [@col];
+	push my @summary_stats, [@cols];
 
-	my @keys =
-	  $col[0] eq 'Visit' ? sort { $a <=> $b } keys %$data : sort keys %$data;
+	my @keys = $cols[0] eq 'Visit' ? sort { $a <=> $b } keys %$data : sort keys %$data;
 
-	@col = $key_index == 0 ? @col : splice @col, 1;
+	@cols = $key_index == 0 ? @cols : splice @cols, 1;
 
 	print STDERR "Computing summary statistics for "
-	  . ( $#col + 1 )
+	  . ( $#cols + 1 )
 	  . " query variable(s): "
-	  . join( ', ', @col ) . " ... \n\n"
+	  . join( ', ', @cols ) . " ... \n\n"
 	  if ( $cache->{verbose} );
 
       # Key can be Visit, Entity_ID or none depending on the command (i.e. search/compare) run.
@@ -486,7 +481,7 @@ sub summary_stats {
 
       for my $key (@keys) {
 		push my @row, ( $key_index == 0 ? () : $key );
-		for my $col (@col) {
+		for my $col (@cols) {
 			my $sdf = Statistics::Descriptive::Full->new();
 
 			# Computing statistics for integer/decimal variables
@@ -496,8 +491,7 @@ sub summary_stats {
 			{
 
 				# Remove single/double quotes (if any) from the numeric array
-				$sdf->add_data( map { s/[\'\"]+//; $_ }
-					  @{ $data->{$key}{$col} } );
+				$sdf->add_data( map { s/[\'\"]+//; $_ } @{ $data->{$key}{$col} } );
 
 				eval {
 					push @row,
@@ -548,9 +542,7 @@ sub summary_stats {
 			}
 		}
 
-		$csv->combine(@row)
-		  ? print $fh $csv->string() . "\n"
-		  : throw_cmd_run_exception( error => $csv->error_input() );
+		$csv->print($fh, \@row) or throw_cmd_run_exception( error => $csv->error_diag() );
 		push @summary_stats, [@row];
 	}
 
@@ -563,6 +555,8 @@ sub summary_stats {
 #------------- SUBCLASSES HOOKS -------------#
 
 sub usage_text { }
+
+sub get_validation_variables { }
 
 sub get_query_parameters { }
 
@@ -623,9 +617,13 @@ This method is responsible for the overall functioning of the command. The metho
 
 =head1 OPTION SPECIFIC PROCESSING
 
+=head2 get_validation_variables()
+
+This method should return a ref to the list for validating variables present under arguments and condition option(s).
+
 =head2 process( $opts, $cache, @args )
 
-This method is always called first, irrespective of the options/arguments specified. The method attempts to query the database using the SQL constructed from the hash ref, returned from L<get_query_parameters|/get_query_parameters( $opts, $datasource, @args )>. Upon successful execution of the SQL query the method returns the output (i.e. C<$result_set>) which is a ref to array of arrays where each array corresponds to one row of entity data.
+The method attempts to query the database using the SQL constructed from the hash ref, returned from L<get_query_parameters|/get_query_parameters( $opts, $datasource, @args )>. Upon successful execution of the SQL query the method returns the output (i.e. C<$result_set>) which is a ref to array of arrays where each array corresponds to one row of entity data.
 
 =head2 save_command( $opts, $cache, @args)
 

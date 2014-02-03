@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -24,7 +24,7 @@ sub usage_text {    # Command is only available to longitudinal datasources
                    Other variables in arguments/cond (option) must be referenced as 'Table.Variable' or 'Visit.Table.Variable' where
                    visit can be Vany, Vlast, V1, V2, V3, etc.
 
-                   The directory specified within the 'out' option must have RWX enabled for CohortExplorer.
+                   The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
                    Conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in 
                    and regexp.
@@ -45,6 +45,17 @@ sub usage_text {    # Command is only available to longitudinal datasources
              \;
 }
 
+
+sub get_validation_variables {
+
+        my ( $self ) = @_;
+
+        my $datasource = $self->cache->get('cache')->{datasource};
+
+        return [ 'Entity_ID', keys %{ $datasource->variables() }, @{ $datasource->visit_variables() } ];  
+
+}
+
 sub get_query_parameters {
 
 	my ( $self, $opts, $datasource, @args ) = @_;
@@ -56,12 +67,12 @@ sub get_query_parameters {
 
         # Extract all variables from args/cond (option) except Entity_ID and Visit as they are dealt separately
 	my @vars = grep( !/^(Entity_ID|Visit)$/,
-		keys %{
-			{
-				map { $_ => 1 } map { s/^V(any|last|[0-9]+)\.//; $_ } @args,
-				keys %{ $opts->{cond} }
-			}
-		  } );
+		         keys % {
+			         {
+				   map { $_ => 1 } map { s/^V(any|last|[0-9]+)\.//; $_ } @args, keys %{ $opts->{cond} }
+			         }
+		         } 
+                       );
 
 	for my $var (@vars) {
 		$var =~ /^([^\.]+)\.(.+)$/; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
@@ -76,7 +87,7 @@ sub get_query_parameters {
 			# Each column corresponds to one visit
 			for (@visits) {
 				push @{ $param{$table_type}{-columns} },
-" CAST( GROUP_CONCAT( IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$var'"
+                                   " CAST( GROUP_CONCAT( IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$var'"
 				  . " AND $struct->{-columns}{visit} = $_, $struct->{-columns}{value}, NULL)) AS "
 				  . ( uc $variables->{$var}{type} )
 				  . " ) AS `V$_.$var`";
@@ -253,42 +264,36 @@ sub process_result_set {
 	my @vars = @{ $result_set->[0] }[@index_to_use];
 
         # Extract last visit specific variables (i.e. Vlast.Var) in args/cond (option)
-	my @last_visit_vars =
-	  grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) );
+	my @last_visit_vars = keys % { { map { $_ => 1 } grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) ) }  };  
 
-	# The entities from the query are stored within a list
+	# Entities from the query are stored within a list
 	my @result_entity;
 
         my $file = File::Spec->catfile($dir, "QueryOutput.csv");
 
-	my $fh = FileHandle->new("> $file")
-	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
-	$csv->combine( ( @vars, @last_visit_vars ) )
-	  ? print $fh $csv->string() . "\n"
-	  : throw_cmd_run_exception( error => $csv->error_input() );
+	my $fh = FileHandle->new("> $file") or throw_cmd_run_exception( error => "Failed to open file: $!" );
+        my @cols = ( @vars, @last_visit_vars );	        
+           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	for my $row ( 1 .. $#$result_set ) {
 		push @result_entity, $result_set->[$row][0];
 
 		# Sort visits in the Visit column
-		$result_set->[$row][3] =
-		  join( ',', ( sort { $a <=> $b } split ',', $result_set->[$row][3] ) )
-		  if ( $index == 3 );
-		my @last_visit_cols =
-		  map { s/^Vlast\.//; "V$result_set->[$row][2].$_" } @last_visit_vars;
+		$result_set->[$row][3] = join( ', ', 
+                                               ( sort { $a <=> $b } split ',', $result_set->[$row][3] ) 
+                                             )  if ( $index == 3 );
+
+		my @last_visit_cols = map { s/^Vlast\.//; "V$result_set->[$row][2].$_" } @last_visit_vars;
+
 		my @last_visit_vals;
 
-		for my $last_visit_col (@last_visit_cols) {
-			my ($index) =
-			  grep { $result_set->[0][$_] eq $last_visit_col }
-			  0 .. $#{ $result_set->[0] };
+		for my $col (@last_visit_cols) {
+			my ($index) = grep { $result_set->[0][$_] eq $col } 0 .. $#{ $result_set->[0] };
 			push @last_visit_vals, $result_set->[$row][$index];
 		}
-		$csv->combine( ( map { $result_set->[$row][$_] } @index_to_use ),
-			@last_visit_vals )
-		  ? print $fh $csv->string()
-		  . "\n"
-		  : throw_cmd_run_exception( error => $csv->error_input() );
+                
+                my @vals = ( ( map { $result_set->[$row][$_] } @index_to_use ), @last_visit_vals );
+	        $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
 	}
 
 	$fh->close();
@@ -338,17 +343,14 @@ sub process_table {
 	# Write table data
 	my $file      = File::Spec->catfile($dir, "$table.csv");
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
-	my $fh        = FileHandle->new("> $untainted")
-	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
-	$csv->combine( ( qw(Entity_ID), @header ) )
-	  ? print $fh $csv->string() . "\n"
-	  : throw_cmd_run_exception( error => $csv->error_input() );
+	my $fh        = FileHandle->new("> $untainted") or throw_cmd_run_exception( error => "Failed to open file: $!" );
+        my @cols       = ( qw(Entity_ID), @header );
+           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	# Write data for entities present in the result set
 	for my $entity (@$result_entity) {
-		$csv->combine( $entity, map { $data{$entity}{$_} } @header )
-		  ? print $fh $csv->string() . "\n"
-		  : throw_cmd_run_exception( error => $csv->error_input() );
+            my @vals = ( $entity, map { $data{$entity}{$_} } @header );
+	       $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
 	}
 
 	$fh->close();
@@ -396,7 +398,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Query::Compare - CohortExplorer command to compare entities across visits
+CohortExplorer::Command::Query::Compare - CohortExplorer class to compare entities across visits
 
 =head1 SYNOPSIS
 
@@ -413,6 +415,10 @@ This class is inherited from L<CohortExplorer::Command::Query> and overrides the
 =head2 usage_text()
 
 This method returns the usage information for the command.
+
+=head2 get_validation_variables()
+
+This method returns a ref to the list containing Entity_ID, all visit and non visit variables for validating arguments and condition option(s).
 
 =head2 get_query_parameters( $opts, $datasource, @args )
 
@@ -452,7 +458,7 @@ Save command
 
 =item B<-S>, B<--stats>
 
-Show statistics
+Show summary statistics
 
 =item B<-c> I<COND>, B<--cond>=I<COND>
             

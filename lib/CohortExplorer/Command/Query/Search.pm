@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.06;
+our $VERSION = 0.07;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -26,7 +26,7 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
                  The conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, 
                  not_in and regexp.
 
-                 The directory specified within the 'out' option must have RWX enabled for CohortExplorer.
+                 The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
 
               EXAMPLES
@@ -42,6 +42,15 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
  \;
 }
 
+sub get_validation_variables {
+
+        my ( $self ) = @_;
+        my $datasource = $self->cache->get('cache')->{datasource};
+        my @vars = keys %{ $datasource->variables() };
+        return  $datasource->type() eq 'standard' ? [ qw/Entity_ID/, @vars ] : [ qw/Entity_ID Visit/, @vars ];  
+
+}
+
 sub get_query_parameters {
 
 	my ( $self, $opts, $datasource, @args ) = @_;
@@ -51,9 +60,11 @@ sub get_query_parameters {
 	my $struct          = $datasource->entity_structure();
 	my %param;
 	my @vars_in_condition = grep ( !/^(Entity_ID|Visit)$/, keys %{ $opts->{cond} } );
-	
-	my %args = map { $_ => 1 } @args;
-	my @vars = ( @args, grep { !$args{$_} } @vars_in_condition );
+
+        require Tie::IxHash;
+
+        tie my %args, 'Tie::IxHash', map { $_ => 1 } @args ;
+	my @vars = ( keys %args, grep { !$args{$_} } @vars_in_condition );
 
 	for (@vars) {
 		/^([^\.]+)\.(.+)$/; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
@@ -73,13 +84,17 @@ sub get_query_parameters {
 		    " CAST( GROUP_CONCAT( "
 		  . ( $table_type eq 'static' ? 'DISTINCT' : '' )
 		  . (
-" IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$_', $struct->{-columns}{value}, NULL ) ) AS "
+                      " IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$_', $struct->{-columns}{value}, NULL ) ) AS "
 		  )
 		  . ( uc $variables->{$_}{type} )
 		  . " ) AS `$_`";
 
-		$param{$table_type}{-having}{"`$_`"} = eval $opts->{cond}{$_}
-		  if ( $opts->{cond} && $opts->{cond}{$_} );
+                
+		
+		  if ( $opts->{cond} && $opts->{cond}{$_} ) {
+                       my ( $opr, $val ) = ( $opts->{cond}{$_} =~ /^\{\'([^\']+)\',(.+)\}$/ );
+                            $param{$table_type}{-having}{"`$_`"} = { $opr => $val }; # Untaint
+                  }
 	}
 
 	for ( keys %param ) {
@@ -144,14 +159,12 @@ sub process_result_set {
 	# empty list (i.e. static tables)
 	for ( 0 .. $#$result_set ) {
 		if ( $_ > 0 ) {
-			push @{ $result_entity{ $result_set->[$_][0] } },
-			  $result_set->[0][1] eq 'Visit' ? $result_set->[$_][1] : ();
+		     push @{ $result_entity{ $result_set->[$_][0] } },
+	             $result_set->[0][1] eq 'Visit' ? $result_set->[$_][1] : ();
 		}
 
-		$csv->combine( @{ $result_set->[$_] } )
-		  ? print $fh $csv->string() . "\n"
-		  : throw_cmd_run_exception( error => $csv->error_input() );
-	}
+                $csv->print($fh, $result_set->[$_]) or throw_cmd_run_exception( error => $csv->error_diag() );
+        }
 
 	$fh->close();
 
@@ -161,8 +174,7 @@ sub process_result_set {
 
 sub process_table {
 
-	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) =
-	  @_;
+	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) = @_;
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $table_type =
 	  $datasource->type() eq 'standard'
@@ -191,26 +203,15 @@ sub process_table {
 	# Add Visit column to the header if the table is dynamic
 	my $file = File::Spec->catfile($dir, "$table.csv");
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
-	my $fh        = FileHandle->new("> $untainted")
-	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
-
-	$csv->combine(
-		(
-			( $table_type eq 'static' ? qw(Entity_ID) : qw(Entity_ID Visit) ),
-			@variable
-		)
-	  )
-	  ? print $fh $csv->string()
-	  . "\n"
-	  : throw_cmd_run_exception( error => $csv->error_input() );
+	my $fh        = FileHandle->new("> $untainted") or throw_cmd_run_exception( error => "Failed to open file: $!" );
+	my @cols      = $table_type eq 'static' ? ( qw(Entity_ID), @variable ) : ( qw(Entity_ID Visit), @variable );
+           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	# Write data for entities present in the result set
 	for my $entity ( sort keys %$result_entity ) {
 		if ( $table_type eq 'static' ) {
-			my @vals = ( $entity, map { $data{$entity}{$_} } @variable );
-			$csv->combine(@vals)
-			  ? print $fh $csv->string() . "\n"
-			  : throw_cmd_run_exception( error => $csv->error_input() );
+                     my @vals = ( $entity, map { $data{$entity}{$_} } @variable );
+	             $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
 		}
 		else {  # For dynamic tables
 			for my $visit (
@@ -219,13 +220,8 @@ sub process_table {
 				: keys %{ $data{$entity} }
 			  )
 			{
-				my @vals = (
-					$entity, $visit,
-					map { $data{$entity}{$visit}{$_} } @variable
-				);
-				$csv->combine(@vals)
-				  ? print $fh $csv->string() . "\n"
-				  : throw_cmd_run_exception( error => $csv->error_input() );
+                               my @vals = ( $entity, $visit, map { $data{$entity}{$visit}{$_} } @variable );
+	                          $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
 			}
 		}
 	}
@@ -277,6 +273,10 @@ This class is inherited from L<CohortExplorer::Command::Query> and overrides the
 =head2 usage_text()
 
 This method returns the usage information for the command.
+
+=head2 get_validation_variables()
+
+This method returns ref to the list containing Entity_ID, Visit (longitudinal datasources) and variables for validating arguments and condition option(s).
 
 =head2 get_query_parameters( $opts, $datasource, @args )
 
