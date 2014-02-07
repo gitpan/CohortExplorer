@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -23,8 +23,8 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
 
                  Other variables in arguments/cond (option) must be referenced as 'Table.Variable'.
 
-                 The conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, 
-                 not_in and regexp.
+                 The conditions can be imposed using the operators: =, !=, >, <, >=, <=, between, not_between, like, not_like, 
+                 in, not_in, regexp and not_regexp.
 
                  The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
@@ -93,6 +93,7 @@ sub get_query_parameters {
 		
 		  if ( $opts->{cond} && $opts->{cond}{$_} ) {
                        my ( $opr, $val ) = ( $opts->{cond}{$_} =~ /^\{\'([^\']+)\',(.+)\}$/ );
+                            $val = !$2 ? undef : eval $2;
                             $param{$table_type}{-having}{"`$_`"} = { $opr => $val }; # Untaint
                   }
 	}
@@ -320,7 +321,7 @@ Show summary statistics
 
 =item B<-c> I<COND>, B<--cond>=I<COND>
             
-Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<gt>=>, C<E<lt>>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in> and C<regexp>.
+Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<lt>>, C<E<gt>=>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in>, C<regexp> and C<not_regexp>.
 
 =back
 

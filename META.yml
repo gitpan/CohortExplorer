@@ -24,7 +24,7 @@ requires:
   Config::General: 2.5
   DBI: 0
   Exception::Class::TryCatch: 1.12
-  File::HomeDir: 1
+  File::HomeDir: 0.98
   File::Spec: 0
   FileHandle: 0
   LWP::UserAgent: 6.03
@@ -36,10 +36,10 @@ requires:
   Term::ReadKey: 2.14
   Test::More: 0
   Text::ASCIITable: 0.20
-  Text::CSV_XS: 1.01
+  Text::CSV_XS: 0.97
   Tie::IxHash: 1.21
   Time::HiRes: 0
   perl: 5.010
 resources:
    license: http://dev.perl.org/licenses/
-version: 0.07
+version: 0.08

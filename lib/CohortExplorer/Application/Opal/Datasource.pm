@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -79,18 +79,17 @@ sub default_parameters {
                 $default{id_visit_separator} = $self->id_visit_separator() || '_';
 
                 # Get static tables (if any) from datasource-config.properties and check them against @allowed_tables
+                my @static_tables = ();
 		my %table = map { $_ => 1 } @{ $default{allowed_tables} };
-		$default{static_tables} = $self->static_tables() || undef;
+                   $default{static_tables} = $self->static_tables() || undef;
+                 
 		if ( $default{static_tables} ) {
 			for ( split /,\s*/, $default{static_tables} ) {
-				unless ( $table{$_} ) {
-					die "'$_' is not a valid table in the datasource $datasource_name\n";
-				}
+				push @static_tables, $_ if ( $table{$_} );
 			}
 		}
 
-		$default{static_tables} = [ split /,\s*/, $default{static_tables} ]
-		  if ( $default{static_tables} );
+		$default{static_tables} = \@static_tables;
 	}
 
         else {
@@ -128,8 +127,9 @@ sub entity_structure {
 		my $id_visit_sep = $self->id_visit_separator();
 		$struct{-columns}{entity_id} =
 		  "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', 1)";
+                # Check for the presence of id_visit_sep
 		$struct{-columns}{visit} =
-		  "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', -1)";
+		  "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', IF ( ve.identifier RLIKE '$id_visit_sep\[0-9\]+\$', -1, NULL ) )";
 	}
 
 	return \%struct;

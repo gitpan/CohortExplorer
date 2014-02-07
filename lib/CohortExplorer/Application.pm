@@ -3,16 +3,12 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
-
-# Directory list for command-line completion
-my @DIRS;
+our $VERSION = 0.08;
 
 use base qw(CLI::Framework::Application);
 use Carp;
 use CLI::Framework::Exceptions qw ( :all);
 use CohortExplorer::Datasource;
-use File::Find;
 use Exception::Class::TryCatch;
 use Term::ReadKey;
 
@@ -301,10 +297,11 @@ sub _cmd_request_completions {
 					  if ( $cmd =~ /^(search|compare)$/ );
 
 				}
-				if ( $cmd =~ /^(search|compare)$/
+
+                                if ( $cmd =~ /^(search|compare)$/
 					&& substr( $line, 0, $start - 1 ) =~ /(\-o|\-\-out)\s*$/ )
 				{
-					return @DIRS;
+					return File::HomeDir->my_home();
 				}
 
 				if ( $cmd =~ /^(search|compare)$/
@@ -401,7 +398,7 @@ sub init {
 	unless ( $opts->{password} ) {
 		 $app->render("Enter password: ");
 		 ReadMode 'noecho';
-		 $opts->{password} = ReadLine(10);
+		 $opts->{password} = ReadLine(60);
 		 ReadMode 'normal';
 		 $app->render("\n");
 
@@ -427,32 +424,6 @@ sub init {
 	);
 
 	if ( $app->get_current_command() eq 'console' ) {
-
-                # If search is a valid command then compile a list of directories 
-                # 'out' option's commmand-line completion
-		if ( !grep( $_ eq 'search', $app->noninteractive_commands() ) ) {
-
-	                # Get all subdirectories under user's home directory
-			no warnings 'File::Find';
-                        require File::HomeDir;
-
-                         eval {
-			      find(
-					{
-						wanted => sub {
-							        push @DIRS, $_ if ( -d );
-						},
-						untaint  => 1,
-						no_chdir => 1
-					},
-					File::HomeDir->my_home()
-				);
-			};
-
-			if ( catch my $e ) {
-			     throw_app_init_exception( error => $e );
-			}
-		}
 
 		$app->render(
 			    "Welcome to the CohortExplorer version $VERSION console." . "\n\n"
@@ -592,8 +563,6 @@ L<CLI::Framework::Application>
 L<CLI::Framework::Exceptions>
 
 L<Exception::Class::TryCatch>
-
-L<File::Find>
 
 L<File::HomeDir>
 

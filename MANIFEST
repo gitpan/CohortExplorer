@@ -1,7 +1,7 @@
 Changes
 config_files/datasource-config.properties
 config_files/log-config.properties
-debian/cohortexplorer_0.07-1_all.deb
+debian/cohortexplorer_0.08-1_all.deb
 lib/CohortExplorer.pm
 lib/CohortExplorer/Application.pm
 lib/CohortExplorer/Application/Opal/Datasource.pm

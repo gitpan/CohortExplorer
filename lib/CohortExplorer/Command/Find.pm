@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -14,15 +14,22 @@ use Exception::Class::TryCatch;
 sub usage_text {
 
     q{
-         find [--fuzzy|f] [--ignore-case|i] [keyword] : find variables using keywords
+         find [--fuzzy|f] [--ignore-case|i] [--and|a] [keyword] : find variables using keywords
 
          
+         By default, the arguments/keywords are joined using 'OR' unless option 'and' is specified.
+
          EXAMPLES
+             
              find --fuzzy --ignore-case cancer diabetes	 (fuzzy and case insensitive search)
 
              find Demographics  (exact search)
 
              find -fi mmHg  (options with bundling and aliases)
+
+             find -fia mmse total (using AND operation)
+
+             
       
      };
 }
@@ -33,6 +40,8 @@ sub option_spec {
           [],
           [ 'ignore-case|i' => 'ignore case' ], 
           [ 'fuzzy|f' => 'fuzzy search' ],
+          [],
+          [ 'and|a' => 'Join keywords using AND (default OR)' ],
           []
     );
 }
@@ -57,14 +66,13 @@ sub run {
         eval 'require ' . ref $datasource;    # May or may not be preloaded
     
         my ( $stmt, @bind, $sth );
-
         # Build a query to search variables based on keywords
         # Look for presence of keywords in -columns specified under $datasource->variable_structure method
         my $struct = $datasource->variable_structure();
         $struct->{$struct->{-group_by} ? -having : -where}{-or} = [
         map {
                 {
-                  $opts->{ignore_case} ? $_ : $_ => { $oper => [@args] }
+                   $opts->{ignore_case} ? $_ : $_ => [ ( $opts->{'and'} ? '-and' : '-or' ) => map { { $oper => $_ } } @args ]
                 }
 
             }
@@ -200,6 +208,10 @@ Fuzzy search
 
 Ignore case
 
+=item B<-a>, B<--and>
+
+Join keywords using AND (default OR)
+
 =back
 
 =head1 DIAGNOSTICS
@@ -250,6 +262,8 @@ L<SQL::Abstract::More>
  find Demographics (exact search)
 
  find -fi mmHg (options with bundling and aliases)
+
+ find -fia mmse total (using AND operation)
 
 
 =head1 SEE ALSO

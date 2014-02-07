@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 50;
@@ -122,7 +122,7 @@ sub validate {
 
 		my ( $opr, $val ) =
 		  $opts->{cond}{$var} =~
-/^\{\'(=|\!=|>|>=|<|<=|between|not_between|like|not_like|in|not_in|regexp)\',(\[(\'[^,\`]+\',?){2,}\]|\'[^\`]+\'|undef)\}$/;
+/^\{\'(=|\!=|>|<|>=|<=|between|not_between|like|not_like|in|not_in|regexp|not_regexp)\',(\[(\'[^,\`]+\',?){2,}\]|\'[^\`]+\'|undef)\}$/;
 
 		# Validating SQL conditions
                 if ( $opr && $val ) {
@@ -155,7 +155,24 @@ sub run {
 
 	# If the result-set is not empty
 	if (@$result_set) {
-		my $dir = $1 if ( $opts->{out} =~ /^(.+)$/ );
+	        my $dir = File::Spec->catdir($1, 'CohortExplorer-'.time.$$) if ( $opts->{out} =~ /^(.+)$/ );
+
+                eval {  mkdir $dir };
+
+                if ( catch my $e ) {
+                     warn $e . "\n";
+                     $dir = $1;
+                }
+
+                else {
+                        eval { chmod 0777, $dir }; 
+                
+                        if ( catch my $e ) { 
+                             warn $e . "\n";
+                             $dir = $1;
+                        }
+                }          
+
 
 		require Text::CSV_XS;
 

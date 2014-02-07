@@ -3,7 +3,7 @@ package CohortExplorer::Command::History;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );

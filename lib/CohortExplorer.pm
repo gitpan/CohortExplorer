@@ -3,7 +3,7 @@ package CohortExplorer;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 #-------
 
@@ -185,7 +185,7 @@ disabling the access to configuration files and log file to users other than the
 
 =head1 BUGS
 
-Currently the application does not support the querying of datasources with multiple arms. The application is only tested with clinical repositories using MySQL. The application is yet to be tested with repositories set-up using Oracle and SQL-server. Please report any bugs or feature requests to adixit@cpan.org.
+Currently the application does not support the querying of datasources with multiple arms. The application is only tested with clinical repositories using MySQL and is yet to be tested with repositories set-up using Oracle and Microsoft SQL Server. Please report any bugs or feature requests to adixit@cpan.org.
 
 =head1 DEPENDENCIES
 
@@ -198,8 +198,6 @@ L<Config::General>
 L<DBI>
 
 L<Exception::Class::TryCatch>
-
-L<File::Find>
 
 L<File::HomeDir>
 

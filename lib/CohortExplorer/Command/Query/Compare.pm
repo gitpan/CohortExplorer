@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -26,10 +26,10 @@ sub usage_text {    # Command is only available to longitudinal datasources
 
                    The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
-                   Conditions can be imposed using the operators: =, !=, >=, >, <, <=, between, not_between, like, not_like, in, not_in 
-                   and regexp.
+                   Conditions can be imposed using the operators: =, !=, >, <, >=, <=, between, not_between, like, not_like, in, not_in, 
+                   regexp and not_regexp.
 
-                   When conditions are imposed on variables with no prefix C<V1>, C<V2>, C<Vany> or C<Vlast>, it is assumed that the
+                   When conditions are imposed on variables with no prefix (e.g. V1, V2, Vany, Vlast etc) it is assumed that the
                    conditions apply to all visits of those variables.
 
 
@@ -462,7 +462,7 @@ Show summary statistics
 
 =item B<-c> I<COND>, B<--cond>=I<COND>
             
-Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<gt>=>, C<E<lt>>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in> and C<regexp>.
+Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<lt>>, C<E<gt>=>, C<E<lt>=>, C<between>, C<not_between>, C<like>, C<not_like>, C<in>, C<not_in>, C<regexp> and C<not_regexp>.
 
 =back
 

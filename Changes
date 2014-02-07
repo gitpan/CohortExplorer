@@ -35,4 +35,10 @@ Revision history for CohortExplorer
 
         - Fixed inconsistency in the validation of variables present in arguments and condition option
 
-         
+
+
+0.08   2014-02-07
+
+        - Fixed bug related to imposing sql conditions in the search command
+
+        - Added support for 'AND' operation in the find command

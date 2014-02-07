@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.07;
+our $VERSION = 0.08;
 
 use Carp;
 use Config::General;
@@ -177,6 +177,8 @@ sub set_entity_parameters {
 	$struct->{-columns} =
 	  [ $struct->{-columns}{entity_id}, $struct->{-columns}{visit} || 'NULL' ];
 
+        $struct->{-where}{'ve.identifier'} =  
+
 	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
 
 	if ( catch my $e ) {
@@ -199,13 +201,14 @@ sub set_entity_parameters {
 	}
 
 	# Validate visit_max, only applicable to longitudinal datasources
-	if ( $datasource->type() eq 'longitudinal'
-		&& ( !$datasource->{visit_max} || $datasource->{visit_max} <= 1 ) )
-	{
-		throw_app_hook_exception(
-			error => "Expecting visit (max) > 1 for a longitudinal datasource "
-			  . $datasource->name() );
-	}
+	if (     $datasource->type() eq 'longitudinal' && 
+             (  !$datasource->{visit_max} 
+              || $datasource->{visit_max} <= 1 
+              || $datasource->{visit_max} > 20 
+             )
+           ) {
+		 throw_app_hook_exception( error => "Expecting visit (max) between 1-20 for a longitudinal datasource" );
+	     }
 
 }
 
