@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 50;
@@ -190,8 +190,8 @@ sub run {
 		$self->export_data( $opts, $cache, $result_set, $dir, $csv, @args );
 
 		return {
-			headingText => 'summary statistics',
-			rows => $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
+			 headingText => 'summary statistics',
+			 rows => $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
 		  }
 		  if ( $opts->{stats} );
 	}
@@ -615,12 +615,12 @@ This class serves as the base class to search and compare command classes. The c
 Returns application option specifications as expected by L<Getopt::Long::Descriptive>
 
        ( 
-         [ 'cond|c=s%'      => 'impose conditions'                           ],
-         [ 'out|o=s'        => 'provide output directory', { required => 1 } ],
-         [ 'save-command|s' => 'save command'                                ],
-         [ 'stats|S'        => 'show summary statistics'                     ],
-         [ 'export|e=s@'    => 'export tables by name'                       ],
-         [ 'export-all|a'   => 'export all tables'                           ] 
+         [ 'cond|c=s%'      => 'impose conditions'         ],
+         [ 'out|o:s'        => 'provide output directory'  ],
+         [ 'save-command|s' => 'save command'              ],
+         [ 'stats|S'        => 'show summary statistics'   ],
+         [ 'export|e=s@'    => 'export tables by name'     ],
+         [ 'export-all|a'   => 'export all tables'         ] 
        )
 
 =head2 validate( $opts, @args )

@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -36,17 +36,17 @@ sub default_parameters {
 	# Add project_id and data_export_tool to the default parameter
 	( $default{project_id}, $default{data_export_tool} ) = @$response;
 
-	# Get static tables and event_id (min)
-	my $stmt = "SELECT GROUP_CONCAT( form_name ), MIN( event_id ) FROM (SELECT event_id, form_name, COUNT( form_name ) AS count FROM redcap_events_forms WHERE event_id IN ( SELECT event_id FROM redcap_data WHERE project_id = ? ) GROUP BY form_name HAVING count = 1 ) AS `table` GROUP BY count";
+	# Get static tables and init_event_id (dynamic tables) and visit_max
+          my $stmt = "SELECT GROUP_CONCAT( if ( count = 1, form_name, NULL ) ) AS static_tables, SUBSTRING_INDEX( GROUP_CONCAT( DISTINCT IF(count > 1, event_id, NULL ) ), ',', 1) AS init_event_id, MAX( count ) AS visit_max FROM (SELECT MIN( event_id ) AS event_id, form_name, COUNT( form_name ) AS count FROM redcap_events_forms WHERE event_id IN ( SELECT event_id FROM redcap_events_metadata WHERE arm_id IN ( SELECT arm_id FROM redcap_events_arms WHERE project_id = ? )) GROUP BY form_name ) AS `table`";
 
-	( $default{static_tables}, $default{init_event_id} ) =
-	  $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
+         ( $default{static_tables}, $default{init_event_id}, $default{visit_max}) =
+	   $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
 
         # If the data was collated across multiple events the datasource is longitudinal
         # otherwise standard (i.e. non-longitudinal)
-	if ( $default{static_tables} ) {
-		$default{type} = 'longitudinal';
-		$default{static_tables} = [ split /,\s*/, $default{static_tables} ];
+	if ( $default{init_event_id} && $default{visit_max} ) {
+	     $default{type} = 'longitudinal';
+	     $default{static_tables} = [ split /,\s*/, $default{static_tables} ];
 	}
 
 	else {
@@ -79,7 +79,7 @@ sub entity_structure {
 	);
 
 	# Add visit column if the datasource is longitudinal
-	$struct{-columns}{visit} = 'rd.event_id-' . $self->init_event_id()
+	$struct{-columns}{visit} = 'rd.event_id - ' . $self->init_event_id() . ' + 1'
 	  if ( $self->type() eq 'longitudinal' );
 
 	return \%struct;
@@ -185,7 +185,7 @@ This method authenticates the user by running the authentication query against t
 
 =head2 default_parameters( $opts, $response )
 
-This method adds C<project_id> and C<data_export_tool> to the datasource object as default parameters. Moreover, the method runs a SQL query to check if the datasource is standard or longitudinal. If the datasource is longitudinal then, C<static_tables> and C<event_id (min)> are added as default parameters.
+This method adds C<project_id> and C<data_export_tool> to the datasource object as default parameters. Moreover, the method runs a SQL query to check if the datasource is standard or longitudinal. If the datasource is longitudinal then, C<static_tables>, C<visit_max> and C<init_event_id> are added as default parameters. At present the application does not support datasources with multiple arms.
 
 =head2 entity_structure()
 

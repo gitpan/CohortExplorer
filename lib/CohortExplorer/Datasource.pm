@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 
 use Carp;
 use Config::General;
@@ -160,8 +160,8 @@ sub set_entity_parameters {
 				  " COUNT( DISTINCT $struct->{-columns}{$_} ) ";
 			}
 			if ( $_ eq 'visit' ) {
-				$struct->{-columns}{$_} =
-				  " MAX( DISTINCT $struct->{-columns}{$_} + 0 ) ";
+				$struct->{-columns}{$_} = $datasource->visit_max() || 
+                                " MAX( DISTINCT $struct->{-columns}{$_} + 0 ) ";
 			}
 		}
 		else {
@@ -204,10 +204,10 @@ sub set_entity_parameters {
 	if (     $datasource->type() eq 'longitudinal' && 
              (  !$datasource->{visit_max} 
               || $datasource->{visit_max} <= 1 
-              || $datasource->{visit_max} > 20 
+              || $datasource->{visit_max} > 99 
              )
            ) {
-		 throw_app_hook_exception( error => "Expecting visit (max) between 1-20 for a longitudinal datasource" );
+		 throw_app_hook_exception( error => "Expecting visit (max) between 2-99 for a longitudinal datasource" );
 	     }
 
 }

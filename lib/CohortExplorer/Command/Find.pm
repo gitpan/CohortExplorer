@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -156,8 +156,9 @@ This method returns the usage information for the command.
 =head2 option_spec() 
 
    ( 
-     [ 'ignore-case|i' => 'ignore case' ], 
-     [ 'fuzzy|f' => 'fuzzy search'      ] 
+     [ 'ignore-case|i' => 'ignore case'                  ], 
+     [ 'fuzzy|f' => 'fuzzy search'                       ],
+     [ 'and|a' => 'Join keywords using AND (default OR)' ] 
    )
 
 =head2 validate( $opts, @args )

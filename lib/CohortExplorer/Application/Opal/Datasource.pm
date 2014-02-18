@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.08;
+our $VERSION = 0.09;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;

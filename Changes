@@ -42,3 +42,9 @@ Revision history for CohortExplorer
         - Fixed bug related to imposing sql conditions in the search command
 
         - Added support for 'AND' operation in the find command
+
+0.09   2014-02-18
+
+        - Fixed inconsistency related to computing visit_max in longitudinal datasources (REDCap)
+
+        - Minor documentaion changes 
