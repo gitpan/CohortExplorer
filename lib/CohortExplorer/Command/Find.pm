@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -13,7 +13,7 @@ use Exception::Class::TryCatch;
 
 sub usage_text {
 
-    q{
+      q{
          find [--fuzzy|f] [--ignore-case|i] [--and|a] [keyword] : find variables using keywords
 
          
@@ -21,110 +21,130 @@ sub usage_text {
 
          EXAMPLES
              
-             find --fuzzy --ignore-case cancer diabetes	 (fuzzy and case insensitive search)
+             find --fuzzy --ignore-case cancer diabetes  (fuzzy and case insensitive search)
 
              find Demographics  (exact search)
 
              find -fi mmHg  (options with bundling and aliases)
 
              find -fia mmse total (using AND operation)
-
-             
-      
-     };
+        };
 }
 
 sub option_spec {
 
-    ( 
-          [],
-          [ 'ignore-case|i' => 'ignore case' ], 
-          [ 'fuzzy|f' => 'fuzzy search' ],
-          [],
-          [ 'and|a' => 'Join keywords using AND (default OR)' ],
-          []
-    );
+	(
+		[],
+		[ 'ignore-case|i' => 'ignore case' ],
+		[ 'fuzzy|f'       => 'fuzzy search' ],
+		[], [ 'and|a' => 'Join keywords using AND (default OR)' ], []
+	);
 }
 
 sub validate {
 
-    my ( $self, $opts, @args ) = @_;
+	my ( $self, $opts, @args ) = @_;
 
-    throw_cmd_validation_exception(
-        error => "At least one argument is required" )
-      unless (@args);
+	throw_cmd_validation_exception(
+		error => "At least one argument is required" )
+	  unless (@args);
 }
 
 sub run {
 
-    my ( $self, $opts, @args ) = @_;
-    my $datasource = $self->cache->get('cache')->{datasource};
-    my $verbose    = $self->cache->get('cache')->{verbose};
-    my $oper = $opts->{fuzzy} ? $opts->{ignore_case} ? -like : 'like binary' : -in;
-    @args = $opts->{fuzzy} ? map { "\%$_%" } @args : @args;
+	my ( $self, $opts, @args ) = @_;
+	my $datasource = $self->cache->get('cache')->{datasource};
+	my $verbose    = $self->cache->get('cache')->{verbose};
+	my $oper = $opts->{ignore_case} ? -like : 'like binary';
+	@args = map { uc $_ } @args    if ( $opts->{ignore_case} );
+	@args = map { "\%$_\%" } @args if ( $opts->{fuzzy} );
 
-        eval 'require ' . ref $datasource;    # May or may not be preloaded
-    
-        my ( $stmt, @bind, $sth );
+	eval 'require ' . ref $datasource;    # May or may not be preloaded
+
+	my ( $stmt, @bind, $sth );
+
         # Build a query to search variables based on keywords
         # Look for presence of keywords in -columns specified under $datasource->variable_structure method
-        my $struct = $datasource->variable_structure();
-        $struct->{$struct->{-group_by} ? -having : -where}{-or} = [
-        map {
-                {
-                   $opts->{ignore_case} ? $_ : $_ => [ ( $opts->{'and'} ? '-and' : '-or' ) => map { { $oper => $_ } } @args ]
-                }
+	my $struct = $datasource->variable_structure();
 
-            }
-               $struct->{-group_by} ? map { "`$_`" } keys %{ $struct->{-columns} } : values %{ $struct->{-columns} }
-        ];
+	$struct->{ $struct->{-group_by} ? -having : -where }{-or} = [
+		map {
+			{
+				$opts->{ignore_case} ? "UPPER($_)" : $_ => [
+					( $opts->{'and'} ? '-and' : '-or' ) => map {
+						{ $oper => $_ }
+					  } @args
+				  ]
+			}
 
-        # Make sure 'variable' and 'table' are the first two columns followed by variable attributes
-        my @columns = ( qw/table variable/, grep ( !/^(table|variable)$/, keys %{$struct->{-columns}} ) );
-        $struct->{-columns} = [ map { $struct->{-columns}{$_} . "|`$_`" } @columns ];
+		  } $struct->{-group_by}
+		? map { "`$_`" } keys %{ $struct->{-columns} }
+		: values %{ $struct->{-columns} }
+	];
 
-        eval {
-               ($stmt, @bind) = $datasource->sqla()->select(%$struct);
-        };
+        # 'variable' and 'table' are the first two columns followed by variable attributes
+	my @columns = (
+		qw/table variable/,
+		grep ( !/^(table|variable)$/, keys %{ $struct->{-columns} } )
+	);
 
-    if ( catch my $e ) {
-        throw_cmd_run_exception( error => $e );
-    }
+	$struct->{-columns} =
+	  [ map { $struct->{-columns}{$_} . "|`$_`" } @columns ];
 
-    eval {
-        $sth = $datasource->dbh->prepare_cached($stmt);
-        $sth->execute(@bind);
-    };
+	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
 
-    if ( catch my $e ) {
-        throw_cmd_run_exception( error => $e );
-    }
+	if ( catch my $e ) {
+		throw_cmd_run_exception( error => $e );
+	}
 
-    push my @rows, ( $sth->{NAME}, @{ $sth->fetchall_arrayref( [] ) } )
-      if ( $sth->rows );
+	# Modifying query
+	my $order_by = $1 if ( $stmt =~ /(ORDER BY\s+.+)$/ );
+	$stmt =~ s/ORDER BY .+$//;
 
-    $sth->finish();
+	my $where = $1 if ( $stmt =~ /HAVING(\s+.+)$/ );
+	$stmt =~ s/HAVING .+$//;
 
-    if (@rows) {
+	$stmt .= $order_by;
+	$stmt =
+	    "SELECT "
+	  . join( ', ', map { "`$_`" } @columns )
+	  . " FROM ( $stmt ) AS custom WHERE $where ";
 
-        print STDERR "Found $#rows variable(s) matching the find query criteria ..."
-          . "\n\n"
-          . "Rendering variable description ..." . "\n\n"
-          if ($verbose);
+	eval {
+		$sth = $datasource->dbh->prepare_cached($stmt);
+		$sth->execute(@bind);
+	};
 
-        return {
-            headingText => 'variable description',
-            rows        => \@rows
-        };
-    }
+	if ( catch my $e ) {
+		throw_cmd_run_exception( error => $e );
+	}
 
-    else {
-        print STDERR "Found 0 variable(s) matching the find query criteria ..."
-          . "\n\n"
-          if ($verbose);
+	push my @rows, ( $sth->{NAME}, @{ $sth->fetchall_arrayref( [] ) } )
+	  if ( $sth->rows );
 
-        return undef;
-    }
+	$sth->finish();
+
+	if (@rows) {
+
+		print STDERR
+		  "Found $#rows variable(s) matching the find query criteria ..."
+		  . "\n\n"
+		  . "Rendering variable description ..." . "\n\n"
+		  if ($verbose);
+
+		return {
+			headingText => 'variable description',
+			rows        => \@rows
+		};
+	}
+
+	else {
+		print STDERR "Found 0 variable(s) matching the find query criteria ..."
+		  . "\n\n"
+		  if ($verbose);
+
+		return undef;
+	}
 
 }
 

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Menu;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw( CLI::Framework::Command::Menu );
 
@@ -11,25 +11,25 @@ use base qw( CLI::Framework::Command::Menu );
 
 sub menu_txt {
 
-	my ($self) = @_;
+    my ($self) = @_;
 
-	my $app = $self->get_app();
+    my $app = $self->get_app();
 
-	# Build a list of valid and visible commands with aliases ...
-	my ( @cmd, $txt );
+    # Build a list of valid and visible commands with aliases ...
+    my ( @cmd, $txt );
 
-	for my $cmd ( $app->get_interactive_commands() ) {
+    for my $cmd ( $app->get_interactive_commands() ) {
 
-		push @cmd, $cmd
-		  unless grep( /^$cmd$/, $app->noninteractive_commands() );
+        push @cmd, $cmd
+          unless grep( /^$cmd$/, $app->noninteractive_commands() );
 
-	}
+    }
 
-	my %aliases = reverse $app->command_alias();
-	for (@cmd) {
-		$txt .= sprintf( "%-5s%2s%10s\n", $aliases{$_}, '-', $_ );
-	}
-	return "\n\n" . $txt . "\n\n";
+    my %aliases = reverse $app->command_alias();
+    for (@cmd) {
+        $txt .= sprintf( "%-5s%2s%10s\n", $aliases{$_}, '-', $_ );
+    }
+    return "\n\n" . $txt . "\n\n";
 }
 
 #-------

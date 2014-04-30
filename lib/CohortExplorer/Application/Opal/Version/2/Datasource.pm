@@ -1,18 +1,21 @@
-package CohortExplorer::Application::Opal::Datasource;
+package CohortExplorer::Application::Opal::Version::2::Datasource;
 
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
+use JSON qw( decode_json );
 
 #-------
 
 sub authenticate {
 
 	my ( $self, $opts ) = @_;
+
+	my $datasource_name = $self->name();
 
 	require LWP::UserAgent;
 	require MIME::Base64;
@@ -22,28 +25,34 @@ sub authenticate {
 	my $ua = LWP::UserAgent->new( timeout => 10 );
 	my $url = $self->url() || 'http://localhost:8080';
 
-	my $request = HTTP::Request->new( GET => $url . '/ws/datasources' );
+	my $request =
+	  HTTP::Request->new( GET => $url . "/ws/datasource/$datasource_name" );
 	$request->header(
 		Authorization => "X-Opal-Auth "
 		  . MIME::Base64::encode( $opts->{username} . ':' . $opts->{password} ),
 		Accept => "application/json"
 	);
-	my $response        = $ua->request($request);
-	my $datasource_name = $self->name();
-	my $response_code   = $response->code();
+	my $response      = $ua->request($request);
+	my $response_code = $response->code();
 
 	if ( $response_code == 200 ) {
-		$response->content() =~
-/\{\"name\"\:\s*\"$datasource_name\",\"link\"\:\s*\"\/datasource\/$datasource_name\",\"table\":\s*\[([^\]]+)\],(\"view\":\s*\[([^\]]+)\])*/;
-		if ($1) {
-                        # Successful authentication returns tables (excluding views) accessible to the user
-			my %views;
-			my @tables = map { s/\"//g; $_ } split /,/, $1;
-			%views = map { s/\"//g; $_ => 1 } split /,/, $3 if ($3);
-			my @tables_excluding_views = grep { not $views{$_} } @tables;
-			die "No tables excluding views found in $datasource_name\n"
+		my $decoded_json = decode_json( $response->decoded_content() );
+		if ( $decoded_json->{type} ne 'mongodb' ) {
+
+	                # Successful authentication returns tables and views accessible to the user
+			my %views = map { $_ => 1 } @{ $decoded_json->{view} || [] };
+			my @tables = @{ $decoded_json->{table} || [] };
+			# Exclude all views
+			my @tables_excluding_views =
+			  defined $decoded_json->{view}
+			  ? grep { not $views{$_} } @tables
+			  : @tables;
+			die "No tables but views found in $datasource_name\n"
 			  unless (@tables_excluding_views);
 			return \@tables_excluding_views;
+		}
+		else {
+			die "Storage type for $datasource_name is not MySQL but MongoDB\n";
 		}
 	}
 
@@ -52,7 +61,7 @@ sub authenticate {
 	}
 
 	else {
-		die "Failed to connect to Opal server via $url (error $response_code)\n";
+		die  "Failed to connect to Opal server via $url (error $response_code)\n";
 	}
 
 }
@@ -76,13 +85,13 @@ sub default_parameters {
 
 	if ( $default{type} eq 'longitudinal' ) {
 
-                $default{id_visit_separator} = $self->id_visit_separator() || '_';
+		$default{id_visit_separator} = $self->id_visit_separator() || '_';
 
                 # Get static tables (if any) from datasource-config.properties and check them against @allowed_tables
-                my @static_tables = ();
+		my @static_tables = ();
 		my %table = map { $_ => 1 } @{ $default{allowed_tables} };
-                   $default{static_tables} = $self->static_tables() || undef;
-                 
+		$default{static_tables} = $self->static_tables() || undef;
+
 		if ( $default{static_tables} ) {
 			for ( split /,\s*/, $default{static_tables} ) {
 				push @static_tables, $_ if ( $table{$_} );
@@ -92,10 +101,52 @@ sub default_parameters {
 		$default{static_tables} = \@static_tables;
 	}
 
-        else {
-                $default{id_visit_separator} = undef;
-                $default{static_tables} = $default{allowed_tables};
-        }
+	else {
+		$default{id_visit_separator} = undef;
+		$default{static_tables}      = $default{allowed_tables};
+	}
+
+	# Get list of allowed variables from each table
+	my $ua = LWP::UserAgent->new( timeout => 10 );
+	my $url = $self->url() || 'http://localhost:8080';
+
+	for my $table ( @{ $default{allowed_tables} } ) {
+		my $request = HTTP::Request->new( GET => $url
+			  . "/ws/datasource/$datasource_name/table/$table/entities" );
+		$request->header(
+			Authorization => "X-Opal-Auth "
+			  . MIME::Base64::encode(
+				$opts->{username} . ':' . $opts->{password}
+			  ),
+			Accept => "application/json"
+		);
+		my $response = $ua->request($request);
+
+		# Get the first identifier
+		if ( $response->code() == 200 ) {
+			my $decoded_json = decode_json( $response->decoded_content() );
+			$request =
+			  HTTP::Request->new( GET => $url
+				  . "/ws/datasource/$datasource_name/table/$table/valueSet/"
+				  . ( $decoded_json->[0]->{identifier} || '' ) );
+			$request->header(
+				Authorization => "X-Opal-Auth "
+				  . MIME::Base64::encode(
+					$opts->{username} . ':' . $opts->{password}
+				  ),
+				Accept => "application/json"
+			);
+
+			$response = $ua->request($request);
+
+			# Get all variables with accessible values
+			if ( $response->code() == 200 ) {
+				$decoded_json = decode_json( $response->decoded_content() );
+				push @{ $default{allowed_variables} },
+				  map { "$table.$_" } @{ $decoded_json->{variables} };
+			}
+		}
+	}
 
 	return \%default;
 }
@@ -127,9 +178,9 @@ sub entity_structure {
 		my $id_visit_sep = $self->id_visit_separator();
 		$struct{-columns}{entity_id} =
 		  "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', 1)";
-                # Check for the presence of id_visit_sep
-		$struct{-columns}{visit} =
-		  "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', IF ( ve.identifier RLIKE '$id_visit_sep\[0-9\]+\$', -1, NULL ) )";
+
+		# Check for the presence of id_visit_sep
+		$struct{-columns}{visit} = "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', IF ( ve.identifier RLIKE '$id_visit_sep\[0-9\]+\$', -1, NULL ) )";
 	}
 
 	return \%struct;
@@ -142,9 +193,9 @@ sub table_structure {
 	return {
 
 		-columns => {
-			table => "GROUP_CONCAT( DISTINCT vt.name)",
+			table          => "GROUP_CONCAT( DISTINCT vt.name)",
 			variable_count => "COUNT( DISTINCT var.id)",
-			entity_type   => "GROUP_CONCAT( DISTINCT vt.entity_type )"
+			entity_type    => "GROUP_CONCAT( DISTINCT vt.entity_type )"
 		},
 		-from => [
 			-join =>
@@ -163,29 +214,7 @@ sub table_structure {
 
 sub variable_structure {
 
-	my ($self)          = @_;
-	my $datasource_name = $self->name();
-	my $username        = $self->username();
-	my %acl;
-
-	# Administrator has access to all variables and tables in the datasource.
-	$acl{'vt.name'} = { -in => $self->allowed_tables() };
-
-	if ( $username ne "administrator" ) {
-
-                # For users other than the administrator only variables with permission TABLE_ALL, TABLE_VALUES,
-                # ADMINISTRATE and VIEW_ALL are retrieved
-		$acl{-or} = [
-			"vt.name" => {
-				-in => \
-"SELECT DISTINCT IF(permission IN ('TABLE_ALL', 'TABLE_VALUES', 'ADMINISTRATE', 'VIEW_ALL'), REPLACE(node, '/datasource/$datasource_name/table/', ''), '')  FROM subject_acl WHERE principal = '$username' AND permission IN ('TABLE_ALL', 'TABLE_VALUES', 'VIEW_ALL', 'ADMINISTRATE')"
-			},
-			"CONCAT(vt.name,'.',var.name)" => {
-				-in => \
-"SELECT DISTINCT IF(permission = 'VARIABLE_READ', REPLACE (node, '/datasource/$datasource_name/table/', ''), '') FROM subject_acl WHERE principal = '$username' AND permission = 'VARIABLE_READ'"
-			}
-		];
-	}
+	my ($self) = @_;
 
 	return {
 
@@ -194,12 +223,9 @@ sub variable_structure {
 			variable => "GROUP_CONCAT( DISTINCT var.name )",
 			table    => "GROUP_CONCAT( DISTINCT vt.name )",
 			type     => "GROUP_CONCAT( DISTINCT var.value_type )",
-			unit =>
-"GROUP_CONCAT( DISTINCT IF( varatt.name = 'unitLabel' AND varatt.name IS NOT NULL, varatt.value, IF( var.unit IS NOT NULL, var.unit, '' )) SEPARATOR '')",
-			category =>
-"GROUP_CONCAT( DISTINCT CONCAT( cat.name, ', ', catatt.value ) SEPARATOR '\\n')",
-			label =>
-"GROUP_CONCAT( DISTINCT IF( varatt.name = 'label', varatt.value, '' ) SEPARATOR ' ')",
+			unit => "GROUP_CONCAT( DISTINCT IF( varatt.name = 'unitLabel' AND varatt.name IS NOT NULL, varatt.value, IF( var.unit IS NOT NULL, var.unit, '' )) SEPARATOR '')",
+			category => "GROUP_CONCAT( DISTINCT CONCAT( cat.name, ', ', catatt.value ) SEPARATOR '\\n')",
+			label => "GROUP_CONCAT( DISTINCT IF( varatt.name = 'label', varatt.value, '' ) SEPARATOR ' ')",
 		},
 		-from => [
 			-join =>
@@ -207,8 +233,9 @@ sub variable_structure {
 		],
 		-where => {
 			'vt.entity_type' => $self->entity_type(),
-			'ds.name'        => $datasource_name,
-			%acl
+			'ds.name'        => $self->name(),
+			"CONCAT( vt.name, '.', var.name )" => 
+			{ -in => $self->allowed_variables() || [] },
 		},
 		-group_by => 'var.id',
 		-order_by => [qw/vt.name var.id var.variable_index/]
@@ -236,7 +263,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::Opal::Datasource - CohortExplorer class to initialise datasource stored under L<Opal (OBiBa)|http://obiba.org/node/63> SQL framework
+CohortExplorer::Application::Opal::Version::2::Datasource - CohortExplorer class to initialise datasource stored under L<Opal v2.0 (OBiBa)|http://obiba.org/node/63> SQL framework
 
 =head1 SYNOPSIS
 
@@ -248,7 +275,7 @@ This method authenticates the user using the REST URL specified in C</etc/Cohort
 
 =head2 default_parameters( $opts, $response )
 
-This method returns a hash ref containing all default parameters. By default,
+This method returns a hash ref containing all default parameters. The method also fetches a list of all variables whose values are accessible to the user via the REST API. By default,
 
   datasource type = standard (i.e. non-longitudinal), 
   entity_type = Participant, 
@@ -264,13 +291,15 @@ This method returns a hash ref defining the table structure. The hash ref includ
 
 =head2 variable_structure()
 
-This method returns a hash ref defining the variable structure. The C<-where> key in the hash ref includes the permission the user should have, to access the variables. The administrator has access to all variables from the specified datasource but for other users only the variables with permission C<TABLE_ALL>, C<TABLE_VALUES>, C<VIEW_ALL> and C<VARIABLE_READ> are accessible. The variable attributes are C<unit>, C<type>, C<category> and C<label>.
+This method returns a hash ref defining the variable structure. The variable attributes are C<unit>, C<type>, C<category> and C<label>.
 
 =head2 datatype_map()
 
 This method returns variable type to SQL type mapping.
 
 =head1 DEPENDENCIES
+
+L<JSON>
 
 L<LWP::UserAgent>
 

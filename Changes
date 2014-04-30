@@ -47,4 +47,10 @@ Revision history for CohortExplorer
 
         - Fixed inconsistency related to computing visit_max in longitudinal datasources (REDCap)
 
-        - Minor documentaion changes 
+        - Minor documentation changes
+
+0.10   2014-04-30
+
+        - Added support for SQL datasources (Opal version 2.0)
+
+        - Minor documentation changes  

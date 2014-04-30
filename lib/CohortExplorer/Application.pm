@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -43,16 +43,16 @@ sub usage_text {
 
 sub option_spec {
 
-	  # Username, password and datasource name are mandatory options
-	  # Password may or may not be provided at start
-	  [],
-	  [ 'datasource|d:s' => 'provide datasource'           ],
-	  [ 'username|u:s'   => 'provide username'             ],
-	  [ 'password|p:s'   => 'provide password'             ],
-	  [],
-	  [ 'verbose|v'      => 'show with verbosity'          ],
-	  [ 'help|h'         => 'show usage message and exit'  ],
-	  [] 
+	# Username, password and datasource name are mandatory options
+	# Password may or may not be provided at start
+	[],
+	[ 'datasource|d:s' => 'provide datasource' ],
+	[ 'username|u:s'   => 'provide username' ],
+	[ 'password|p:s'   => 'provide password' ],
+	[],
+	[ 'verbose|v' => 'show with verbosity' ],
+	[ 'help|h'    => 'show usage message and exit' ],
+	[]
 
 }
 
@@ -62,8 +62,8 @@ sub validate_options {
 
 	# Show help and exit ...
 	if ( $opts->{help} || keys %$opts == 0 ) {
-	     $app->render( $app->get_default_usage() );
-	     exit;
+		$app->render( $app->get_default_usage() );
+		exit;
 	}
 
 	else {
@@ -72,7 +72,7 @@ sub validate_options {
 			|| !exists $opts->{password} )
 		{
 			throw_app_opts_validation_exception(
-				error => "Make sure all mandatory parameters are specified" );
+				error => "All mandatory parameters must be provided" );
 		}
 	}
 }
@@ -92,7 +92,7 @@ sub command_map {
 
 sub command_alias {
 
-	  h    => 'help',
+	h      => 'help',
 	  m    => 'menu',
 	  s    => 'search',
 	  c    => 'compare',
@@ -128,9 +128,9 @@ sub render {
 
 	my ( $app, $output ) = @_;
 
-	# Output from commands (excluding help) is hash with keys headingText and rows
-	# headingText = a scalar with table heading
-	# rows = ref to array of arrays
+        # Output from commands (excluding help) is hash with keys headingText and rows
+        # headingText = a scalar with table heading
+        # rows = ref to array of arrays
 	if ( ref $output eq 'HASH' ) {
 		require Text::ASCIITable;
 		my $table = Text::ASCIITable->new(
@@ -161,19 +161,20 @@ sub render {
 			$table->addRow(@row);
 		}
 
-                if ( $^O eq 'linux' ) {
-                     delete @ENV{qw(PATH)};
-		     $ENV{PATH} = "/usr/bin:/bin";
-		     my $path = $ENV{'PATH'};
+		if ( $^O eq 'linux' ) {
+			delete @ENV{qw(PATH)};
+			$ENV{PATH} = "/usr/bin:/bin";
+			my $path = $ENV{'PATH'};
 
-		     open( my $less, '|-', $ENV{PAGER} || 'less', '-e' ) or croak "Failed to pipe to pager: $!\n";
-		     print $less "\n" . $table . "\n";
-		     close($less);
-                }
+			open( my $less, '|-', $ENV{PAGER} || 'less', '-e' )
+			  or croak "Failed to pipe to pager: $!\n";
+			print $less "\n" . $table . "\n";
+			close($less);
+		}
 
-                else {
-                       print "\n". $table . "\n";
-                }
+		else {
+			print "\n" . $table . "\n";
+		}
 	}
 
 	else {
@@ -192,7 +193,8 @@ sub handle_exception {
 	my $cache = $app->cache->get('cache');
 
 	# Logs exceptions
-	$cache->{logger}->error( $e->description() . ' [ User: ', $cache->{user} . ' ]' )
+	$cache->{logger}
+	  ->error( $e->description() . ' [ User: ', $cache->{user} . ' ]' )
 	  if ($cache);
 
 	return;
@@ -205,7 +207,7 @@ sub pre_dispatch {
 	my $cache = $app->cache->get('cache');
 
 	my @invalid_commands =
-	   grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
+	  grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
 
 	my $current_command = $app->get_current_command();
 
@@ -219,7 +221,6 @@ sub pre_dispatch {
 	  ->info( "Command '$current_command' is run by " . $cache->{user} );
 
 }
-
 
 sub read_cmd {
 
@@ -270,7 +271,7 @@ sub _cmd_request_completions {
 
 	# Valid only when the application is running in console/interactive mode
 	return sub {
-		
+
 		my ( $text, $line, $start ) = @_;
 		my $datasource      = $app->cache->get('cache')->{datasource};
 		my $datasource_type = $datasource->type();
@@ -290,7 +291,7 @@ sub _cmd_request_completions {
 
 				# Listen to options
 				if ( $text =~ /^\s*\-/ ) {
-					return qw(--show --clear)         if ( $cmd eq 'history' );
+					return qw(--show --clear)        if ( $cmd eq 'history' );
 					return qw(--fuzzy --ignore-case) if ( $cmd eq 'find' );
 					return
 					  qw(--out --cond --save-command --stats --export --export-all)
@@ -298,49 +299,49 @@ sub _cmd_request_completions {
 
 				}
 
-                                if ( $cmd =~ /^(search|compare)$/
+				if ( $cmd =~ /^(search|compare)$/
 					&& substr( $line, 0, $start - 1 ) =~ /(\-o|\-\-out)\s*$/ )
 				{
 					return File::HomeDir->my_home();
 				}
 
 				if ( $cmd =~ /^(search|compare)$/
-					&& substr( $line, 0, $start - 1 ) =~ /(\-e|\-\-export)\s*$/ )
+					&& substr( $line, 0, $start - 1 ) =~
+					/(\-e|\-\-export)\s*$/ )
 				{
 					return keys %{ $datasource->tables() };
 				}
 
-				if (   $cmd eq 'search'
+				if ( $cmd eq 'search'
 					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
 				{
-					return
-					  map { $_ . "=\"{'opr','val'}\"" }
-					  ( $datasource_type eq 'standard'
+					return map { $_ . "=\"{'opr','val'}\"" } (
+						$datasource_type eq 'standard'
 						? qw(Entity_ID)
-						: qw(Entity_ID Visit) ),
+						: qw(Entity_ID Visit)
+					  ),
 					  keys %{ $datasource->variables() };
 				}
 
-				if (   $cmd eq 'compare'
+				if ( $cmd eq 'compare'
 					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
 				{
-					return map { $_ . "=\"{'opr','val'}\"" }
-					  (
-                                                qw(Entity_ID),
+					return map { $_ . "=\"{'opr','val'}\"" } (
+						qw(Entity_ID),
 						keys %{ $datasource->variables() },
 						@{ $datasource->visit_variables() || [] }
-					  );
+					);
 				}
 
 				# Listen to arguments
 				else {
 					if ( $cmd eq 'search' ) {
-					     return keys %{ $datasource->variables() };
+						return keys %{ $datasource->variables() };
 					}
 
-                                        elsif ( $cmd eq 'find' ) {
-                                                return keys %{ $datasource->tables() };
-                                        }
+					elsif ( $cmd eq 'find' ) {
+						return keys %{ $datasource->tables() };
+					}
 
 					elsif ( $cmd eq 'compare' ) {
 						return (
@@ -372,46 +373,56 @@ sub init {
 	my ( $app, $opts ) = @_;
 
 	require Log::Log4perl;
-        require File::Spec;
-        require File::HomeDir;
+	require File::Spec;
+	require File::HomeDir;
 
-        # Path to log configuration file
-        my $log_config_file = File::Spec->catfile(File::Spec->rootdir(),  'etc', 'CohortExplorer', 'log-config.properties');
+	# Path to log configuration file
+	my $log_config_file = File::Spec->catfile(
+		File::Spec->rootdir(), 'etc',
+		'CohortExplorer',      'log-config.properties'
+	);
 
 	# Initialise logger
 	eval { Log::Log4perl::init($log_config_file); };
 
 	if ( catch my $e ) {
-	     throw_app_init_exception( error => $e );
+		throw_app_init_exception( error => $e );
 	}
 
 	my $logger = Log::Log4perl->get_logger();
 
-        # Check command history file
-        my $command_history_file = File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History");
+	# Check command history file
+	my $command_history_file =
+	  File::Spec->catfile( File::HomeDir->my_home(),
+		".CohortExplorer_History" );
 
-        if (!-r $command_history_file || !-w $command_history_file) {
-            throw_app_init_exception( error => "Make sure $command_history_file exists with RW enabled (i.e. chmod 766) for CohortExplorer");
-        }
+	if ( !-r $command_history_file || !-w $command_history_file ) {
+		throw_app_init_exception( error =>
+        "'$command_history_file' must exist with RW enabled (i.e. chmod 766) for CohortExplorer"
+		);
+	}
 
 	# Prompt for password if not provided at command line
 	unless ( $opts->{password} ) {
-		 $app->render("Enter password: ");
-		 ReadMode 'noecho';
-		 $opts->{password} = ReadLine(60);
-		 ReadMode 'normal';
-		 $app->render("\n");
+		$app->render("Enter password: ");
+		ReadMode 'noecho';
+		$opts->{password} = ReadLine(60);
+		ReadMode 'normal';
+		$app->render("\n");
 
-		 unless ( $opts->{password} ) {
-		          $app->render("timeout\n");
-			  exit;
-		 }
+		unless ( $opts->{password} ) {
+			$app->render("timeout\n");
+			exit;
+		}
 	}
 
 	chomp $opts->{password};
 
-        # Path to datasource configuration file
-        my $datasource_config_file = File::Spec->catfile(File::Spec->rootdir(), 'etc', 'CohortExplorer', 'datasource-config.properties');
+	# Path to datasource configuration file
+	my $datasource_config_file = File::Spec->catfile(
+		File::Spec->rootdir(), 'etc',
+		'CohortExplorer',      'datasource-config.properties'
+	);
 
 	# Initialise the datasource and store in cache for further use
 	$app->cache->set(
@@ -419,7 +430,9 @@ sub init {
 			verbose    => $opts->{verbose},
 			user       => $opts->{username} . '@' . $opts->{datasource},
 			logger     => $logger,
-			datasource => CohortExplorer::Datasource->initialise( $opts, $datasource_config_file )
+			datasource => CohortExplorer::Datasource->initialise(
+				$opts, $datasource_config_file
+			)
 		}
 	);
 

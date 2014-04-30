@@ -3,14 +3,15 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
 
 #-------
 
-sub usage_text {    # Command is available to both standard and longitudinal datasources
+sub usage_text
+{    # Command is available to both standard and longitudinal datasources
 
 	q\
               search [--out|o=<directory>] [--export|e=<table>] [--export-all|a] [--save-command|s] [--stats|S] [--cond|c=<cond>] 
@@ -44,10 +45,12 @@ sub usage_text {    # Command is available to both standard and longitudinal dat
 
 sub get_validation_variables {
 
-        my ( $self ) = @_;
-        my $datasource = $self->cache->get('cache')->{datasource};
-        my @vars = keys %{ $datasource->variables() };
-        return  $datasource->type() eq 'standard' ? [ qw/Entity_ID/, @vars ] : [ qw/Entity_ID Visit/, @vars ];  
+	my ($self)     = @_;
+	my $datasource = $self->cache->get('cache')->{datasource};
+	my @vars       = keys %{ $datasource->variables() };
+	return $datasource->type() eq 'standard'
+	  ? [ qw/Entity_ID/, @vars ]
+	  : [ qw/Entity_ID Visit/, @vars ];
 
 }
 
@@ -59,15 +62,17 @@ sub get_query_parameters {
 	my @static_tables   = @{ $datasource->static_tables() || [] };
 	my $struct          = $datasource->entity_structure();
 	my %param;
-	my @vars_in_condition = grep ( !/^(Entity_ID|Visit)$/, keys %{ $opts->{cond} } );
+	my @vars_in_condition =
+	  grep ( !/^(Entity_ID|Visit)$/, keys %{ $opts->{cond} } );
 
-        require Tie::IxHash;
+	require Tie::IxHash;
 
-        tie my %args, 'Tie::IxHash', map { $_ => 1 } @args ;
+	tie my %args, 'Tie::IxHash', map { $_ => 1 } @args;
 	my @vars = ( keys %args, grep { !$args{$_} } @vars_in_condition );
 
 	for (@vars) {
-		/^([^\.]+)\.(.+)$/; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
+		/^([^\.]+)\.(.+)$/; 
+                # Extract tables and variable names, a variable is referenced as 'Table.Variable'
 		my $table_type =
 		  $datasource_type eq 'standard'
 		  ? 'static'
@@ -77,25 +82,27 @@ sub get_query_parameters {
                 # Each key contains its own SQL parameters
                 # In static tables the rows are grouped on Entity_ID where as in dynamic tables
                 # (i.e. longitudinal datasources) the rows are grouped on Entity_ID and Visit
-                push @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} }, $1;
-                
-                push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }{-in} }, $2;
+		push
+		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
+		  $1;
+
+		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }
+			  {-in} }, $2;
 		push @{ $param{$table_type}{-columns} },
 		    " CAST( GROUP_CONCAT( "
 		  . ( $table_type eq 'static' ? 'DISTINCT' : '' )
 		  . (
-                      " IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$_', $struct->{-columns}{value}, NULL ) ) AS "
+            " IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$_', $struct->{-columns}{value}, NULL ) ) AS "
 		  )
 		  . ( uc $variables->{$_}{type} )
 		  . " ) AS `$_`";
 
-                
-		
-		  if ( $opts->{cond} && $opts->{cond}{$_} ) {
-                       my ( $opr, $val ) = ( $opts->{cond}{$_} =~ /^\{\'([^\']+)\',(.+)\}$/ );
-                            $val = !$2 ? undef : eval $2;
-                            $param{$table_type}{-having}{"`$_`"} = { $opr => $val }; # Untaint
-                  }
+		if ( $opts->{cond} && $opts->{cond}{$_} ) {
+			my ( $opr, $val ) =
+			  ( $opts->{cond}{$_} =~ /^\{\'([^\']+)\',(.+)\}$/ );
+			$val = !$2 ? undef : eval $2;
+			$param{$table_type}{-having}{"`$_`"} = { $opr => $val };   # Untaint
+		}
 	}
 
 	for ( keys %param ) {
@@ -150,7 +157,7 @@ sub process_result_set {
 	my %result_entity;
 
 	# Write result set
-        my $file = File::Spec->catfile($dir, "QueryOutput.csv");
+	my $file = File::Spec->catfile( $dir, "QueryOutput.csv" );
 	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
@@ -160,12 +167,13 @@ sub process_result_set {
 	# empty list (i.e. static tables)
 	for ( 0 .. $#$result_set ) {
 		if ( $_ > 0 ) {
-		     push @{ $result_entity{ $result_set->[$_][0] } },
-	             $result_set->[0][1] eq 'Visit' ? $result_set->[$_][1] : ();
+			push @{ $result_entity{ $result_set->[$_][0] } },
+			  $result_set->[0][1] eq 'Visit' ? $result_set->[$_][1] : ();
 		}
 
-                $csv->print($fh, $result_set->[$_]) or throw_cmd_run_exception( error => $csv->error_diag() );
-        }
+		$csv->print( $fh, $result_set->[$_] )
+		  or throw_cmd_run_exception( error => $csv->error_diag() );
+	}
 
 	$fh->close();
 
@@ -175,7 +183,8 @@ sub process_result_set {
 
 sub process_table {
 
-	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) = @_;
+	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) =
+	  @_;
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $table_type =
 	  $datasource->type() eq 'standard'
@@ -202,27 +211,37 @@ sub process_table {
 	}
 
 	# Add Visit column to the header if the table is dynamic
-	my $file = File::Spec->catfile($dir, "$table.csv");
+	my $file = File::Spec->catfile( $dir, "$table.csv" );
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
-	my $fh        = FileHandle->new("> $untainted") or throw_cmd_run_exception( error => "Failed to open file: $!" );
-	my @cols      = $table_type eq 'static' ? ( qw(Entity_ID), @variable ) : ( qw(Entity_ID Visit), @variable );
-           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
+	my $fh = FileHandle->new("> $untainted")
+	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
+	my @cols =
+	  $table_type eq 'static'
+	  ? ( qw(Entity_ID), @variable )
+	  : ( qw(Entity_ID Visit), @variable );
+	$csv->print( $fh, \@cols )
+	  or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	# Write data for entities present in the result set
 	for my $entity ( sort keys %$result_entity ) {
 		if ( $table_type eq 'static' ) {
-                     my @vals = ( $entity, map { $data{$entity}{$_} } @variable );
-	             $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
+			my @vals = ( $entity, map { $data{$entity}{$_} } @variable );
+			$csv->print( $fh, \@vals )
+			  or throw_cmd_run_exception( error => $csv->error_diag() );
 		}
-		else {  # For dynamic tables
+		else {    # For dynamic tables
 			for my $visit (
 				  @{ $result_entity->{$entity} }
 				? @{ $result_entity->{$entity} }
 				: keys %{ $data{$entity} }
 			  )
 			{
-                               my @vals = ( $entity, $visit, map { $data{$entity}{$visit}{$_} } @variable );
-	                          $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
+				my @vals = (
+					$entity, $visit,
+					map { $data{$entity}{$visit}{$_} } @variable
+				);
+				$csv->print( $fh, \@vals )
+				  or throw_cmd_run_exception( error => $csv->error_diag() );
 			}
 		}
 	}

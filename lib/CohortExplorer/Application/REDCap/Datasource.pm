@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CohortExplorer::Datasource);
 use Exception::Class::TryCatch;
@@ -21,7 +21,7 @@ sub authenticate {
 
 	my @bind = ( $self->name(), $opts->{username}, $opts->{password} );
 
-        # Successful authentication outputs array_ref as response
+	# Successful authentication outputs array_ref as response
 	my $response = $self->dbh()->selectrow_arrayref( $stmt, undef, @bind );
 
 	return $response;
@@ -37,16 +37,16 @@ sub default_parameters {
 	( $default{project_id}, $default{data_export_tool} ) = @$response;
 
 	# Get static tables and init_event_id (dynamic tables) and visit_max
-          my $stmt = "SELECT GROUP_CONCAT( if ( count = 1, form_name, NULL ) ) AS static_tables, SUBSTRING_INDEX( GROUP_CONCAT( DISTINCT IF(count > 1, event_id, NULL ) ), ',', 1) AS init_event_id, MAX( count ) AS visit_max FROM (SELECT MIN( event_id ) AS event_id, form_name, COUNT( form_name ) AS count FROM redcap_events_forms WHERE event_id IN ( SELECT event_id FROM redcap_events_metadata WHERE arm_id IN ( SELECT arm_id FROM redcap_events_arms WHERE project_id = ? )) GROUP BY form_name ) AS `table`";
+	my $stmt = "SELECT GROUP_CONCAT( if ( count = 1, form_name, NULL ) ) AS static_tables, SUBSTRING_INDEX( GROUP_CONCAT( DISTINCT IF(count > 1, event_id, NULL ) ), ',', 1) AS init_event_id, MAX( count ) AS visit_max FROM (SELECT MIN( event_id ) AS event_id, form_name, COUNT( form_name ) AS count FROM redcap_events_forms WHERE event_id IN ( SELECT event_id FROM redcap_events_metadata WHERE arm_id IN ( SELECT arm_id FROM redcap_events_arms WHERE project_id = ? )) GROUP BY form_name ) AS `table`";
 
-         ( $default{static_tables}, $default{init_event_id}, $default{visit_max}) =
-	   $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
+	( $default{static_tables}, $default{init_event_id}, $default{visit_max} ) =
+	  $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
 
         # If the data was collated across multiple events the datasource is longitudinal
         # otherwise standard (i.e. non-longitudinal)
 	if ( $default{init_event_id} && $default{visit_max} ) {
-	     $default{type} = 'longitudinal';
-	     $default{static_tables} = [ split /,\s*/, $default{static_tables} ];
+		$default{type} = 'longitudinal';
+		$default{static_tables} = [ split /,\s*/, $default{static_tables} ];
 	}
 
 	else {
@@ -79,7 +79,8 @@ sub entity_structure {
 	);
 
 	# Add visit column if the datasource is longitudinal
-	$struct{-columns}{visit} = 'rd.event_id - ' . $self->init_event_id() . ' + 1'
+	$struct{-columns}{visit} =
+	  'rd.event_id - ' . $self->init_event_id() . ' + 1'
 	  if ( $self->type() eq 'longitudinal' );
 
 	return \%struct;
@@ -119,11 +120,9 @@ sub variable_structure {
 		-columns => {
 			variable => "field_name",
 			table    => "form_name",
-			type =>
-"IF( element_validation_type IS NULL, 'text', element_validation_type)",
+			type => "IF( element_validation_type IS NULL, 'text', element_validation_type)",
 			unit => "field_units",
-			category =>
-"IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')",
+			category => "IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')",
 			label => "element_label"
 		},
 		-from  => 'redcap_metadata',

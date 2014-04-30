@@ -3,7 +3,7 @@ package CohortExplorer::Command::History;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -13,9 +13,9 @@ use CohortExplorer::Command::Query qw($COMMAND_HISTORY);
 
 sub usage_text {
 
-	     q{
-                 history [--show|s] [--clear|c] : show saved commands
-              };
+	q{
+           history [--show|s] [--clear|c] : show saved commands
+         };
 }
 
 sub option_spec {
@@ -51,14 +51,10 @@ sub run {
 
 	# Shows all saved commands for the current datasource
 	if ( $opts->{show} && @saved_commands ) {
-		push my @rows, [qw/Command_No Datetime Command/];
+		push my @rows, [qw/Command_No Command/];
 		for (@saved_commands) {
 			push @rows,
-			  [
-				$_,
-				$COMMAND_HISTORY->{datasource}{$alias}{$_}{datetime},
-				$COMMAND_HISTORY->{datasource}{$alias}{$_}{command}
-			  ];
+			  [ $_, $COMMAND_HISTORY->{datasource}{$alias}{$_}{command} ];
 
 		}
 

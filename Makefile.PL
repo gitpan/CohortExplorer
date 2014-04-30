@@ -21,6 +21,7 @@ WriteMakefile(
 		'FileHandle'                 => 0,
                 'File::HomeDir'              => 0.98,
                 'File::Spec'                 => 0,
+                'JSON'                       => 2.53,
 		'Log::Log4perl'              => 1.29,
 		'LWP::UserAgent'             => 6.03,
 		'MIME::Base64'               => 0,

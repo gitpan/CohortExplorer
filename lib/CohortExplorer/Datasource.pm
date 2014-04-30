@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use Carp;
 use Config::General;
@@ -33,7 +33,7 @@ sub initialise {
 	};
 
 	if ( catch my $e ) {
-	      throw_app_init_exception( error => $e );
+		throw_app_init_exception( error => $e );
 	}
 
 	throw_app_init_exception(
@@ -41,31 +41,29 @@ sub initialise {
 	  unless ($param);
 
 	throw_app_init_exception( error =>
-		  "Mandatory parameter namespace missing from '$opts->{datasource}'" )
+		  "Mandatory parameter 'namespace' is missing from '$opts->{datasource}'" )
 	  unless ( $param->{namespace} );
 
-        # Untaint
-	$param->{namespace} =~ /^(.+)$/g;
-        my $target_pkg = "CohortExplorer::Application::".ucfirst $1."::Datasource";
+	eval "require $1"
+	  if ( $param->{namespace} =~ /^(.+)$/g );    # May or may not be preloaded
 
-        $param->{name} ||= $opts->{datasource};
-	$param->{alias}     = $opts->{datasource};
+	$param->{name} ||= $opts->{datasource};
+	$param->{alias} = $opts->{datasource};
 	$param->{dialect} ||= 'MySQL_old';
 
-        eval "require $target_pkg";    # May or may not be preloaded
-
 	eval {
-		$param->{dbh} = DBI->connect( $param->{dsn}, $param->{username}, $param->{password},
+		$param->{dbh} =
+		  DBI->connect( $param->{dsn}, $param->{username}, $param->{password},
 			{ PrintError => 0, RaiseError => 1 } );
 	};
 
 	if ( catch my $e ) {
-	     throw_app_init_exception( error => $e );
+		throw_app_init_exception( error => $e );
 	}
 
 	for (qw(dsn username password)) {
-             # Remove DSN, username and password
-             delete $param->{$_};
+                # Remove DSN, username and password
+		delete $param->{$_};
 	}
 
 	# Add sqla object
@@ -74,8 +72,9 @@ sub initialise {
 		max_members_IN => 100
 	);
 
-        # Instantiate datasource
-	my $obj = $target_pkg->new($param) or croak "Failed to instantiate datasource package '$target_pkg' via new(): $!";
+	# Instantiate datasource
+	my $obj = $1->new($param)
+	  or croak "Failed to instantiate datasource package '$1' via new(): $!";
 
 	$obj->_process($opts);
 	return $obj;
@@ -85,17 +84,18 @@ sub _process {
 
 	my ( $datasource, $opts ) = @_;
 
-	print STDERR "Authenticating '$opts->{username}\@$opts->{datasource}' ...\n"
+	print STDERR "Authenticating $opts->{username}\@$opts->{datasource} ...\n"
 	  if ( $opts->{verbose} );
 
 	my $response = $datasource->authenticate($opts);
-		
+
 	# Successful authentication returns a defined response
 	throw_app_init_exception( error =>
-		  "Failed to authenticate '$opts->{username}\@$opts->{datasource}'" )
+		  "Failed to authenticate $opts->{username}\@$opts->{datasource}" )
 	  unless ($response);
 
-	print STDERR "Initializing application for '$opts->{username}\@$opts->{datasource}' ...\n"
+	print STDERR
+      "Initializing application for $opts->{username}\@$opts->{datasource} ...\n"
 	  if ( $opts->{verbose} );
 
 	my $class = ref $datasource;
@@ -103,7 +103,7 @@ sub _process {
 	my $default_param = $datasource->default_parameters( $opts, $response );
 
 	throw_app_hook_exception( error =>
-          "return from method 'default_parameters' in class $class is not hash worthy"
+      "return from method 'default_parameters' in class '$class' is not hash worthy"
 	) unless ( ref $default_param eq 'HASH' );
 
 	for ( keys %$default_param ) {
@@ -112,9 +112,10 @@ sub _process {
 
 	my $datasource_type = $datasource->type();
 
-	throw_app_hook_exception(
-		error => "Datasource is neither standard nor longitudinal" )
-	  if ( !$datasource_type || $datasource_type !~ /^(standard|longitudinal)$/ );
+	throw_app_hook_exception( error =>
+		  "Datasource type (i.e. standard/longitudinal) is not found" )
+	  if (!$datasource_type
+		|| $datasource_type !~ /^(standard|longitudinal)$/ );
 
 	require Tie::IxHash;
 
@@ -130,7 +131,7 @@ sub _process {
 		}
 
 		throw_app_hook_exception( error =>
-                      "'-columns' in method '$method' of class '$class' is not hash worthy"
+         "'-columns' in method '$method' of class '$class' is not hash worthy"
 		) unless ref $struct->{-columns} eq 'HASH';
 
 		# Set entity params (i.e. entity_count, visit_max), tables and variables
@@ -138,7 +139,8 @@ sub _process {
 		$datasource->$method($struct);
 	}
 
-	$datasource->set_visit_variables() if ( $datasource_type eq 'longitudinal' );
+	$datasource->set_visit_variables()
+	  if ( $datasource_type eq 'longitudinal' );
 
 }
 
@@ -160,13 +162,13 @@ sub set_entity_parameters {
 				  " COUNT( DISTINCT $struct->{-columns}{$_} ) ";
 			}
 			if ( $_ eq 'visit' ) {
-				$struct->{-columns}{$_} = $datasource->visit_max() || 
-                                " MAX( DISTINCT $struct->{-columns}{$_} + 0 ) ";
+				$struct->{-columns}{$_} = $datasource->visit_max()
+				  || " MAX( DISTINCT $struct->{-columns}{$_} + 0 ) ";
 			}
 		}
 		else {
 			throw_app_hook_exception( error =>
-                         "Missing column '$_' in method 'entity_structure' of class '$class' "
+             "Missing column '$_' in method 'entity_structure' of class '$class' "
 			);
 		}
 	}
@@ -177,9 +179,9 @@ sub set_entity_parameters {
 	$struct->{-columns} =
 	  [ $struct->{-columns}{entity_id}, $struct->{-columns}{visit} || 'NULL' ];
 
-        $struct->{-where}{'ve.identifier'} =  
+	$struct->{-where}{'ve.identifier'} =
 
-	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
+	  eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
@@ -197,18 +199,22 @@ sub set_entity_parameters {
 	# Validate entity_count
 	if ( $datasource->{entity_count} == 0 ) {
 		throw_app_hook_exception(
-			error => 'No entity found in datasource ' . $datasource->name() );
+			error => 'No entities are found in datasource '
+			  . $datasource->name() );
 	}
 
 	# Validate visit_max, only applicable to longitudinal datasources
-	if (     $datasource->type() eq 'longitudinal' && 
-             (  !$datasource->{visit_max} 
-              || $datasource->{visit_max} <= 1 
-              || $datasource->{visit_max} > 99 
-             )
-           ) {
-		 throw_app_hook_exception( error => "Expecting visit (max) between 2-99 for a longitudinal datasource" );
-	     }
+	if (
+		$datasource->type() eq 'longitudinal'
+		&& (  !$datasource->{visit_max}
+			|| $datasource->{visit_max} <= 1
+			|| $datasource->{visit_max} > 99 )
+	  )
+	{
+		throw_app_hook_exception( error =>
+			  "Expecting Visit (max) between 2-99 for a longitudinal datasource"
+		);
+	}
 
 }
 
@@ -219,13 +225,14 @@ sub set_table_parameters {
 	my $datasource_name = $datasource->name();
 
 	throw_app_hook_exception( error =>
-        "Missing column 'table' in method 'table_structure' of class '$class' "
+     "Missing column 'table' in method 'table_structure' of class '$class' "
 	) unless ( $struct->{-columns}{table} );
 
 	my ( $stmt, @bind, $sth );
-	$struct->{-columns} =
-	  [ map { $struct->{-columns}{$_} . "|`$_`" }
-		  keys %{ $struct->{-columns} } ];
+	$struct->{-columns} = [
+		map { $struct->{-columns}{$_} . "|`$_`" }
+		  keys %{ $struct->{-columns} }
+	];
 
 	# Retrieve data on tables
 	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
@@ -247,14 +254,14 @@ sub set_table_parameters {
 	$sth->finish();
 
 	throw_app_hook_exception(
-		error => "No tables found in datasource $datasource_name" )
+		error => "No accessible 'tables' are found in datasource '$datasource_name'" )
 	  unless (@rows);
 
 	tie %{ $datasource->{tables} }, "Tie::IxHash";    # Preserve order of tables
 
 	for my $row (@rows) {
 		throw_app_hook_exception( error =>
-			  "Undefined table (name) found in datasource $datasource_name" )
+			  "Undefined table '$row->{table}' found in datasource '$datasource_name'" )
 		  unless ( $row->{table} );
 		$datasource->{tables}{ $row->{table} } = $row;
 	}
@@ -268,14 +275,15 @@ sub set_variable_parameters {
 
 	# Check -columns hash has mandatory keys 'table' and 'variable'
 	throw_app_hook_exception( error =>
-       "Column variable/table missing from method variable_structure in class $class"
+    "Column variable/table missing from method 'variable_structure' in class '$class'"
 	) if ( !$struct->{-columns}{variable} || !$struct->{-columns}{table} );
 
 	my ( $stmt, @bind, $sth );
 
-	$struct->{-columns} =
-	  [ map { $struct->{-columns}{$_} . "|`$_`" }
-		  keys %{ $struct->{-columns} } ];
+	$struct->{-columns} = [
+		map { $struct->{-columns}{$_} . "|`$_`" }
+		  keys %{ $struct->{-columns} }
+	];
 
 	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
 
@@ -295,15 +303,15 @@ sub set_variable_parameters {
 	my @rows = @{ $sth->fetchall_arrayref( {} ) };
 	$sth->finish();
 
-	throw_app_hook_exception(
-		error => "No variables found in datasource $datasource_name" )
+	throw_app_hook_exception( error =>
+		  "No accessible 'variables' are found in datasource '$datasource_name'" )
 	  unless (@rows);
 
 	# Get the variable data type to sql data type mapping
 	my $datatype_map = $datasource->datatype_map();
 
 	throw_app_hook_exception( error =>
-		  "return from method 'datatype_map' in class $class is not hash worthy"
+		  "return from method 'datatype_map' in class '$class' is not hash worthy"
 	) unless ( ref $datatype_map eq 'HASH' );
 
 	tie %{ $datasource->{variables} },
@@ -311,7 +319,7 @@ sub set_variable_parameters {
 
 	for my $row (@rows) {
 		throw_app_hook_exception( error =>
-			  "Undefined table/variable found in datasource $datasource_name" )
+			  "Undefined table/variable found in datasource '$datasource_name'" )
 		  if ( !$row->{table} || !$row->{variable} );
 
                 # Variables are referenced as 'Table.Variable'
@@ -334,7 +342,7 @@ sub new {
 
 sub set_visit_variables {
 
-	my ( $datasource ) = @_;
+	my ($datasource) = @_;
 
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $visit_max = $datasource->visit_max();
@@ -504,7 +512,7 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
 CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C<datasource-config.properties>) to instantiate the datasource object. The config file takes the format below,
 
         <datasource Clinical> 
-         namespace=Opal
+         namespace=CohortExplorer::Application::Opal::Version::1::Datasource
          type=longitudinal
          static_tables=Demographics,FamilyHistory
          url=myhost
@@ -514,7 +522,7 @@ CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factor
        </datasource> 
 
        <datasource Clinical1> 
-         namespace=Opal
+         namespace=CohortExplorer::Application::Opal::Version::1::Datasource
          type=longitudinal
          id_visit_separator=_
          name=Clinical
@@ -525,7 +533,7 @@ CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factor
        </datasource> 
 
        <datasource Drugs> 
-         namespace=REDCap
+         namespace=CohortExplorer::Application::REDCap::Datasource
          dsn=DBI:mysql:database=opal;host=myhost;port=3306
          username=yourusername
          password=yourpassword
@@ -734,7 +742,9 @@ L<Tie::IxHash>
 
 L<CohortExplorer>
 
-L<CohortExplorer::Application::Opal::Datasource>
+L<CohortExplorer::Application::Opal::Version::1::Datasource>
+
+L<CohortExplorer::Application::Opal::Version::2::Datasource>
 
 L<CohortExplorer::Application::REDCap::Datasource>
 

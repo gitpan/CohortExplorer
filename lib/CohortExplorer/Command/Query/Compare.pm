@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -45,14 +45,17 @@ sub usage_text {    # Command is only available to longitudinal datasources
              \;
 }
 
-
 sub get_validation_variables {
 
-        my ( $self ) = @_;
+	my ($self) = @_;
 
-        my $datasource = $self->cache->get('cache')->{datasource};
+	my $datasource = $self->cache->get('cache')->{datasource};
 
-        return [ 'Entity_ID', keys %{ $datasource->variables() }, @{ $datasource->visit_variables() } ];  
+	return [
+		'Entity_ID',
+		keys %{ $datasource->variables() },
+		@{ $datasource->visit_variables() }
+	];
 
 }
 
@@ -67,27 +70,31 @@ sub get_query_parameters {
 
         # Extract all variables from args/cond (option) except Entity_ID and Visit as they are dealt separately
 	my @vars = grep( !/^(Entity_ID|Visit)$/,
-		         keys % {
-			         {
-				   map { $_ => 1 } map { s/^V(any|last|[0-9]+)\.//; $_ } @args, keys %{ $opts->{cond} }
-			         }
-		         } 
-                       );
+		keys %{
+			{
+				map { $_ => 1 } map { s/^V(any|last|[0-9]+)\.//; $_ } @args,
+				keys %{ $opts->{cond} }
+			}
+		  } );
 
 	for my $var (@vars) {
-		$var =~ /^([^\.]+)\.(.+)$/; # Extract tables and variable names, a variable is referenced as 'Table.Variable'
+		$var =~ /^([^\.]+)\.(.+)$/; 
+		# Extract tables and variable names, a variable is referenced as 'Table.Variable'
 		# Build a hash with keys 'static' and 'dynamic'
 		# Each keys contains its own sql parameters
 		my $table_type = grep ( /^$1$/, @static_tables ) ? 'static' : 'dynamic';
-		push @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} }, $1;
-		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }{-in} }, $2;
+		push
+		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
+		  $1;
+		push @{ $param{$table_type}{-where}{ $struct->{-columns}{variable} }
+			  {-in} }, $2;
 
 		if ( $table_type eq 'dynamic' ) {
 
 			# Each column corresponds to one visit
 			for (@visits) {
 				push @{ $param{$table_type}{-columns} },
-                                   " CAST( GROUP_CONCAT( IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$var'"
+                    " CAST( GROUP_CONCAT( IF( CONCAT( $struct->{-columns}{table}, '.', $struct->{-columns}{variable} ) = '$var'"
 				  . " AND $struct->{-columns}{visit} = $_, $struct->{-columns}{value}, NULL)) AS "
 				  . ( uc $variables->{$var}{type} )
 				  . " ) AS `V$_.$var`";
@@ -110,14 +117,18 @@ sub get_query_parameters {
 
 	                # Build conditions for visit variables e.g. V1.Var, Vlast.Var, Vany.Var etc.
 	                # Values inside array references are joined as 'OR' and hashes as 'AND'
-			my @visit_vars = grep( /^(V(any|last|[0-9]+)\.$var|$var)$/, keys %{ $opts->{cond} } );
+			my @visit_vars = grep( /^(V(any|last|[0-9]+)\.$var|$var)$/,
+				keys %{ $opts->{cond} } );
 
 			for my $visit_var ( sort @visit_vars ) {
+
                                 # Last visits (i.e. Vlast) for entities are not known in advance so practically any
                                 # visit can be the last visit for any entity
 				if ( $visit_var =~ /^Vlast\.$var$/ ) {
-				     my ( $opr, $val ) = ( $opts->{cond}{"Vlast.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
-					  $val = !$2 ? undef : eval $2;
+					my ( $opr, $val ) =
+					  ( $opts->{cond}{"Vlast.$var"} =~
+						  /^\{\'([^\']+)\',(.+)\}$/ );
+					$val = !$2 ? undef : eval $2;
 
 					if ( defined $param{$table_type}{-having}{-or} ) {
 						map {
@@ -140,7 +151,9 @@ sub get_query_parameters {
 
 				# Vany includes all visit variables joined as 'OR'
 				elsif ( $visit_var =~ /^Vany\.$var$/ ) {
-					my ( $opr, $val ) = ( $opts->{cond}{"Vany.$var"} =~ /^\{\'([^\']+)\',(.+)\}$/ );
+					my ( $opr, $val ) =
+					  ( $opts->{cond}{"Vany.$var"} =~
+						  /^\{\'([^\']+)\',(.+)\}$/ );
 					$val = !$2 ? undef : eval $2;
 
 					if ( defined $param{$table_type}{-having}{-and} ) {
@@ -236,7 +249,6 @@ sub get_query_parameters {
 	return \%param;
 }
 
-
 sub process_result_set {
 
 	my ( $self, $opts, $datasource, $result_set, $dir, $csv, @args ) = @_;
@@ -248,62 +260,77 @@ sub process_result_set {
 	my $index = $result_set->[0][3] && $result_set->[0][3] eq 'Visit' ? 3 : 0;
 
 	# Compiling regex to extract variables specified as args/cond (option)
-	my $regex = join '|', map { s/^Vany\.//; $_ } @args, keys %{ $opts->{cond} };
+	my $regex = join '|', map { s/^Vany\.//; $_ } @args,
+	   keys %{ $opts->{cond} };
 
 	$regex = qr/$regex/;
 
-	my @index_to_use = sort { $a <=> $b } keys % {
+	my @index_to_use = sort { $a <=> $b } keys %{
 		{
 			map { $_ => 1 } (
-				          0 .. $index,
-				          grep( $result_set->[0][$_] =~ $regex, 0 .. $#{ $result_set->[0] } )
-			                )
+				0 .. $index,
+				grep( $result_set->[0][$_] =~ $regex,
+					0 .. $#{ $result_set->[0] } )
+			)
 		}
 	  };
 
 	my @vars = @{ $result_set->[0] }[@index_to_use];
 
         # Extract last visit specific variables (i.e. Vlast.Var) in args/cond (option)
-	my @last_visit_vars = keys % { { map { $_ => 1 } grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) ) }  };  
+	my @last_visit_vars = keys %{
+		{
+			map { $_ => 1 }
+			  grep( /^Vlast\./, ( @args, keys %{ $opts->{cond} } ) )
+		}
+	  };
 
 	# Entities from the query are stored within a list
 	my @result_entity;
 
-        my $file = File::Spec->catfile($dir, "QueryOutput.csv");
+	my $file = File::Spec->catfile( $dir, "QueryOutput.csv" );
 
-	my $fh = FileHandle->new("> $file") or throw_cmd_run_exception( error => "Failed to open file: $!" );
-        my @cols = ( @vars, @last_visit_vars );	        
-           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
+	my $fh = FileHandle->new("> $file")
+	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
+	my @cols = ( @vars, @last_visit_vars );
+	$csv->print( $fh, \@cols )
+	  or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	for my $row ( 1 .. $#$result_set ) {
 		push @result_entity, $result_set->[$row][0];
 
 		# Sort visits in the Visit column
-		$result_set->[$row][3] = join( ', ', 
-                                               ( sort { $a <=> $b } split ',', $result_set->[$row][3] ) 
-                                             )  if ( $index == 3 );
+		$result_set->[$row][3] =
+		  join( ', ', ( sort { $a <=> $b } split ',', $result_set->[$row][3] ) )
+		  if ( $index == 3 );
 
-		my @last_visit_cols = map { s/^Vlast\.//; "V$result_set->[$row][2].$_" } @last_visit_vars;
+		my @last_visit_cols =
+		  map { s/^Vlast\.//; "V$result_set->[$row][2].$_" } @last_visit_vars;
 
 		my @last_visit_vals;
 
 		for my $col (@last_visit_cols) {
-			my ($index) = grep { $result_set->[0][$_] eq $col } 0 .. $#{ $result_set->[0] };
+			my ($index) =
+			  grep { $result_set->[0][$_] eq $col } 0 .. $#{ $result_set->[0] };
 			push @last_visit_vals, $result_set->[$row][$index];
 		}
-                
-                my @vals = ( ( map { $result_set->[$row][$_] } @index_to_use ), @last_visit_vals );
-	        $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
+
+		my @vals = (
+			( map { $result_set->[$row][$_] } @index_to_use ),
+			@last_visit_vals
+		);
+		$csv->print( $fh, \@vals )
+		  or throw_cmd_run_exception( error => $csv->error_diag() );
 	}
 
 	$fh->close();
 	return \@result_entity;
 }
 
-
 sub process_table {
 
-	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) = @_;
+	my ( $self, $table, $datasource, $table_data, $dir, $csv, $result_entity ) =
+	  @_;
 
 	my @static_tables = @{ $datasource->static_tables() || [] };
 	my $table_type =
@@ -341,21 +368,23 @@ sub process_table {
 	}
 
 	# Write table data
-	my $file      = File::Spec->catfile($dir, "$table.csv");
+	my $file = File::Spec->catfile( $dir, "$table.csv" );
 	my $untainted = $1 if ( $file =~ /^(.+)$/ );
-	my $fh        = FileHandle->new("> $untainted") or throw_cmd_run_exception( error => "Failed to open file: $!" );
-        my @cols       = ( qw(Entity_ID), @header );
-           $csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
+	my $fh = FileHandle->new("> $untainted")
+	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
+	my @cols = ( qw(Entity_ID), @header );
+	$csv->print( $fh, \@cols )
+	  or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	# Write data for entities present in the result set
 	for my $entity (@$result_entity) {
-            my @vals = ( $entity, map { $data{$entity}{$_} } @header );
-	       $csv->print($fh, \@vals) or throw_cmd_run_exception( error => $csv->error_diag() );
+		my @vals = ( $entity, map { $data{$entity}{$_} } @header );
+		$csv->print( $fh, \@vals )
+		  or throw_cmd_run_exception( error => $csv->error_diag() );
 	}
 
 	$fh->close();
 }
-
 
 sub get_stats_data {
 
@@ -376,7 +405,9 @@ sub get_stats_data {
 		for my $var (@vars) {
 			$data{ $result_set->[$row][0] }{$var} = [
 				map {
-				       $result_set->[0][$_] =~ /$var$/ ? $result_set->[$row][$_] || () : ()
+					    $result_set->[0][$_] =~ /$var$/
+					  ? $result_set->[$row][$_] || ()
+					  : ()
 				  } $index + 1 .. $#{ $result_set->[0] }
 			];
 			$data{ $result_set->[$row][0] }{'Visit'} =

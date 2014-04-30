@@ -3,7 +3,7 @@ package CohortExplorer::Command::Describe;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -12,9 +12,9 @@ use CLI::Framework::Exceptions qw( :all );
 
 sub usage_text {
 
-	q{
-            describe : show datasource description including entity count 
-         };
+	    q{
+               describe : show datasource description including entity count 
+             };
 
 }
 
@@ -38,7 +38,7 @@ sub run {
 
 	my $tables = $cache->{datasource}->tables();
 
-        # Get tables in the datasource with 'table' as the first column followed by table attributes
+        # Get all accessible tables in the datasource with 'table' as the first column followed by table attributes
 	my @columns = (
 		'table',
 		grep ( !/^table$/, keys %{ $tables->{ ( keys %$tables )[-1] } } )

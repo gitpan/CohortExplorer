@@ -3,28 +3,34 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.09;
+our $VERSION = 0.10;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
-my $ARG_MAX = 50;
+my $ARG_MAX = 500;
 
 #-------
 
 BEGIN {
-        use base qw(CLI::Framework::Command Exporter);
-        use CLI::Framework::Exceptions qw( :all );
-        use CohortExplorer::Datasource;
-        use Exception::Class::TryCatch;
-        use FileHandle;
-        use File::HomeDir;
-        use File::Spec;
-        use Config::General;
+	use base qw(CLI::Framework::Command Exporter);
+	use CLI::Framework::Exceptions qw( :all );
+	use CohortExplorer::Datasource;
+	use Exception::Class::TryCatch;
+	use FileHandle;
+	use File::HomeDir;
+	use File::Spec;
+	use Config::General;
 
-	$COMMAND_HISTORY_FILE = $1 if ( File::Spec->catfile(File::HomeDir->my_home(), ".CohortExplorer_History") =~ /^(.+)$/ );
-	
-	my $fh = FileHandle->new( ">> $COMMAND_HISTORY_FILE" );
-        throw_cmd_run_exception( error => "Make sure $COMMAND_HISTORY_FILE exists with RW enabled (i.e. chmod 766) for CohortExplorer" ) unless ($fh);
-        $fh->close();
+	$COMMAND_HISTORY_FILE = $1
+	  if (
+		File::Spec->catfile( File::HomeDir->my_home(),
+			".CohortExplorer_History" ) =~ /^(.+)$/
+	  );
+
+	my $fh = FileHandle->new(">> $COMMAND_HISTORY_FILE");
+	throw_cmd_run_exception( error =>
+      "'$COMMAND_HISTORY_FILE' must exist with RW enabled (i.e. chmod 766) for CohortExplorer"
+	) unless ($fh);
+	$fh->close();
 
 	eval {
 		$COMMAND_HISTORY_CONFIG = Config::General->new(
@@ -36,7 +42,7 @@ BEGIN {
 	};
 
 	if ( catch my $e ) {
-	     throw_cmd_run_exception( error => $e );
+		throw_cmd_run_exception( error => $e );
 	}
 
 	$COMMAND_HISTORY = { $COMMAND_HISTORY_CONFIG->getall() };
@@ -47,12 +53,12 @@ sub option_spec {
 
 	(
 		[],
-		[ 'cond|c=s%'      => 'impose conditions'         ],
-		[ 'out|o:s'        => 'provide output directory'  ],
-		[ 'save-command|s' => 'save command'              ],
-		[ 'stats|S'        => 'show summary statistics'   ],
-		[ 'export|e=s@'    => 'export tables by name'     ],
-		[ 'export-all|a'   => 'export all tables'         ],
+		[ 'cond|c=s%'      => 'impose conditions' ],
+		[ 'out|o:s'        => 'provide output directory' ],
+		[ 'save-command|s' => 'save command' ],
+		[ 'stats|S'        => 'show summary statistics' ],
+		[ 'export|e=s@'    => 'export tables by name' ],
+		[ 'export-all|a'   => 'export all tables' ],
 		[]
 	);
 }
@@ -69,20 +75,20 @@ sub validate {
 	  if ( $cache->{verbose} );
 
 	# --- VALIDATE ARG LENGTH, EXPORT AND OUT OPTIONS ---
-        throw_cmd_validation_exception(
+	throw_cmd_validation_exception(
 		error => "At least 1-$ARG_MAX variable(s) are required" )
 	  unless ( @args && @args <= $ARG_MAX );
 
-        throw_cmd_validation_exception(
+	throw_cmd_validation_exception(
 		error => "Option 'out' (i.e. output directory) is missing" )
 	  unless ( $opts->{out} );
 
-	throw_cmd_validation_exception(
-		error => "Make sure '$opts->{out}' exists with RWX enabled (i.e. chmod 777) for CohortExplorer" )
-	  unless ( -d $opts->{out} && -w $opts->{out} );
+	throw_cmd_validation_exception( error =>
+    "Output dir '$opts->{out}' must exist with RWX enabled (i.e. chmod 777) for CohortExplorer"
+	) unless ( -d $opts->{out} && -w $opts->{out} );
 
 	throw_cmd_validation_exception( error =>
-                "Mutually exclusive options (export and export-all) specified together"
+    "Mutually exclusive options (export and export-all) specified together"
 	) if ( $opts->{export} && $opts->{export_all} );
 
 	my $datasource = $cache->{datasource};
@@ -105,11 +111,12 @@ sub validate {
 	my @vars = @{ $self->get_validation_variables() };
 
 	for my $var (@args) {
-		throw_cmd_validation_exception( error => 
-                 "Entity_ID and Visit (if applicable) are already part of the query set"
+		throw_cmd_validation_exception( error =>
+         "Entity_ID and Visit (if applicable) are already part of the query set"
 		) if ( $var =~ /^(Entity_ID|Visit)$/ );
 
-		throw_cmd_validation_exception( error => "Invalid variable '$var' in arguments" )
+		throw_cmd_validation_exception(
+			error => "Invalid variable '$var' in arguments" )
 		  unless ( grep( /^$var$/, @vars ) );
 	}
 
@@ -125,7 +132,7 @@ sub validate {
 /^\{\'(=|\!=|>|<|>=|<=|between|not_between|like|not_like|in|not_in|regexp|not_regexp)\',(\[(\'[^,\`]+\',?){2,}\]|\'[^\`]+\'|undef)\}$/;
 
 		# Validating SQL conditions
-                if ( $opr && $val ) {
+		if ( $opr && $val ) {
 
                         # Operators (between, not_between, in and not_in) require array but for others it is optional
 			if ( $opr =~ /(between|in)/ ) {
@@ -155,24 +162,24 @@ sub run {
 
 	# If the result-set is not empty
 	if (@$result_set) {
-	        my $dir = File::Spec->catdir($1, 'CohortExplorer-'.time.$$) if ( $opts->{out} =~ /^(.+)$/ );
+		my $dir = File::Spec->catdir( $1, 'CohortExplorer-' . time . $$ )
+		  if ( $opts->{out} =~ /^(.+)$/ );
 
-                eval {  mkdir $dir };
+		eval { mkdir $dir };
 
-                if ( catch my $e ) {
-                     warn $e . "\n";
-                     $dir = $1;
-                }
+		if ( catch my $e ) {
+			warn $e . "\n";
+			$dir = $1;
+		}
 
-                else {
-                        eval { chmod 0777, $dir }; 
-                
-                        if ( catch my $e ) { 
-                             warn $e . "\n";
-                             $dir = $1;
-                        }
-                }          
+		else {
+			eval { chmod 0777, $dir };
 
+			if ( catch my $e ) {
+				warn $e . "\n";
+				$dir = $1;
+			}
+		}
 
 		require Text::CSV_XS;
 
@@ -184,14 +191,15 @@ sub run {
 				'sep_char'    => ',',
 				'binary'      => 1,
 				'auto_diag'   => 1,
-                                'eol'         => $/
+				'eol'         => $/
 			}
 		);
 		$self->export_data( $opts, $cache, $result_set, $dir, $csv, @args );
 
 		return {
-			 headingText => 'summary statistics',
-			 rows => $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
+			headingText => 'summary statistics',
+			rows =>
+			  $self->summary_stats( $opts, $cache, $result_set, $dir, $csv )
 		  }
 		  if ( $opts->{stats} );
 	}
@@ -205,15 +213,15 @@ sub process {
 
 	my $datasource = $cache->{datasource};
 	my $sqla       = $datasource->sqla();
- 
-        # --- PREPARE QUERY PARAMETERS FROM CONDITION OPTION AND ARGS ---
+
+	# --- PREPARE QUERY PARAMETERS FROM CONDITION OPTION AND ARGS ---
 
         # Query parameters can be static, dynamic or both
         # Static type is applicable to 'standard' datasource but it may also be applicable
         # to 'longitudinal' datasource provided the datasource contains tables which
         # are independent of visits (i.e. static tables). Dynamic type is associated
-        # with longitudinal datasources only
-        my $param = $self->get_query_parameters( $opts, $datasource, @args );
+         # with longitudinal datasources only
+	my $param = $self->get_query_parameters( $opts, $datasource, @args );
 
 	my ( $stmt, $var, $sth, @rows );
 
@@ -234,19 +242,25 @@ sub process {
 
 		require Tie::IxHash;    # May or may not be preloaded
 
-		tie my %vars, 'Tie::IxHash', map { $_ => 1 } ( '`Entity_ID`', $param->{$type}{stmt} =~ /AS\s+(\`[^\`]+\`),?/g );
+		tie my %vars, 'Tie::IxHash',
+		  map { $_ => 1 }
+		  ( '`Entity_ID`', $param->{$type}{stmt} =~ /AS\s+(\`[^\`]+\`),?/g );
 
-                my @quoted_bind = map { s/\'//g; "`$_`" } @{$param->{$type}{bind} };
-                my @var_placeholder = grep ( defined $vars{$quoted_bind[$_]}, 0 .. $#quoted_bind );
-                
-                if (@var_placeholder) {
-                     # No variables in placeholders as they need to be hard coded
-		     for ( 0 .. $#var_placeholder ) {
+		my @quoted_bind = map { s/\'//g; "`$_`" } @{ $param->{$type}{bind} };
+		my @var_placeholder =
+		  grep ( defined $vars{ $quoted_bind[$_] }, 0 .. $#quoted_bind );
+
+		if (@var_placeholder) {
+
+			# No variables in placeholders as they need to be hard coded
+			for ( 0 .. $#var_placeholder ) {
 				my $count = 0;
-                                $param->{$type}{stmt} =~ s/(\?)/$count++ == $var_placeholder[$_]-$_ ? $quoted_bind[$var_placeholder[$_]] : $1/ge;
+				$param->{$type}{stmt} =~
+                s/(\?)/$count++ == $var_placeholder[$_]-$_ ? $quoted_bind[$var_placeholder[$_]] : $1/ge;
 				delete( $param->{$type}{bind}->[ $var_placeholder[$_] ] );
-		      }
-		      @{ $param->{$type}{bind} } = grep( defined($_), @{ $param->{$type}{bind} } );
+			}
+			@{ $param->{$type}{bind} } =
+			  grep( defined($_), @{ $param->{$type}{bind} } );
 		}
 
 		delete $vars{'`Entity_ID`'};
@@ -257,18 +271,24 @@ sub process {
 		$stmt = $param->{ ( keys %$param )[0] }{stmt};
 	}
 
-	else {  # both static and dynamic parameters are present
+	else {    # both static and dynamic parameters are present
 
                 # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
                 # Inner join is done when conditions are imposed on static tables alone
-                $stmt =
+		$stmt =
 		    'SELECT dynamic.Entity_ID, '
 		  . join( ', ', map { @{ $var->{$_} } } keys %$var )
 		  . ' FROM '
 		  . join(
-			  ( ( ( !$param->{static}{-having}{Entity_ID} && keys % { $param->{static}{-having} } == 1) 
-                               || keys % { $param->{static}{-having} } > 1 
-                             )  ? ' INNER JOIN ' : ' LEFT OUTER JOIN '),
+			(
+				(
+					(
+						!$param->{static}{-having}{Entity_ID}
+						  && keys %{ $param->{static}{-having} } == 1
+					)
+					  || keys %{ $param->{static}{-having} } > 1
+				) ? ' INNER JOIN ' : ' LEFT OUTER JOIN '
+			),
 			map { "( " . $param->{$_}{stmt} . " ) AS $_" } keys %$param
 		  ) . ' ON dynamic.Entity_ID = static.Entity_ID';
 	}
@@ -295,10 +315,10 @@ sub process {
 
 	my $timeEnd = Time::HiRes::time();
 
-	printf( "Found %d rows in %.2f sec matching the %s query criteria ...\n\n",
-		($sth->rows() || 0),
-		($timeEnd - $timeStart),
-                 $command
+	printf(
+		"Found %d rows in %.2f sec matching the %s query criteria ...\n\n",
+		( $sth->rows() || 0 ),
+		( $timeEnd - $timeStart ), $command
 	) if ( $cache->{verbose} );
 
 	push @rows, ( $sth->{NAME}, @{ $sth->fetchall_arrayref( [] ) } )
@@ -312,19 +332,19 @@ sub save_command {
 	my ( $self, $opts, $cache, @args ) = @_;
 	my $alias = $cache->{datasource}->alias();
 	my $count = scalar keys %{ $COMMAND_HISTORY->{datasource}{$alias} };
-      ( my $command = lc ref $self ) =~ s/^.+:://;
+	( my $command = lc ref $self ) =~ s/^.+:://;
 
 	print STDERR "Saving command ..." . "\n\n" if ( $cache->{verbose} );
 
 	require POSIX;
 
-        # Remove the save-command option
-        delete $opts->{save_command};
+	# Remove the save-command option
+	delete $opts->{save_command};
 
 	# Construct the command run by the user and store it in $COMMAND_HISTORY
 	for my $opt ( keys %$opts ) {
 		if ( ref $opts->{$opt} eq 'ARRAY' ) {
-			 $command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
+			$command .= " --$opt=" . join( " --$opt=", @{ $opts->{$opt} } );
 		}
 		elsif ( ref $opts->{$opt} eq 'HASH' ) {
 			$command .= join(
@@ -336,7 +356,8 @@ sub save_command {
 		else {
 			( $_ = $opt ) =~ s/_/-/g;
 			$command .= " --$_=$opts->{$opt} ";
-			$command =~ s/($_)=1/$1/ if ( $opts->{export_all} || $opts->{stats} );
+			$command =~ s/($_)=1/$1/
+			  if ( $opts->{export_all} || $opts->{stats} );
 		}
 	}
 
@@ -345,7 +366,7 @@ sub save_command {
 	$command =~ s/\s+/ /g;
 
 	for ( keys %{ $COMMAND_HISTORY->{datasource} } ) {
-		  $COMMAND_HISTORY->{datasource}{$_}{ ++$count } = {
+		$COMMAND_HISTORY->{datasource}{$_}{ ++$count } = {
 			datetime => POSIX::strftime( '%d/%m/%Y %T', localtime ),
 			command  => $command
 		  }
@@ -361,9 +382,9 @@ sub export_data {
 	my $datasource = $cache->{datasource};
 
 	# Write query param file
-        my $file = File::Spec->catfile($dir, "QueryParameters");
-	my $fh = FileHandle->new("> $file")	  
-           or throw_cmd_run_exception( error => "Failed to open file: $!" );
+	my $file = File::Spec->catfile( $dir, "QueryParameters" );
+	my $fh = FileHandle->new("> $file")
+	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
 	print $fh "Query Parameters" . "\n\n";
 	print $fh "Arguments supplied: " . join( ', ', @args ) . "\n\n";
@@ -378,7 +399,7 @@ sub export_data {
 	}
 	print $fh "\n"
 	  . "Tables exported: "
-	  . ( $opts->{export} ? join ', ', @{ $opts->{export} } : 'None' ). "\n";
+	  . ( $opts->{export} ? join ', ', @{ $opts->{export} } : 'None' ) . "\n";
 
 	$fh->close();
 
@@ -422,6 +443,7 @@ sub export_data {
 		  0 .. $#chunk;
 
 		for my $table ( @{ $opts->{export} } ) {
+
                         # Ensure the user has access to at least one variable in the table to be exported ...
 			if (
 				grep ( /^$table\..+$/,
@@ -472,31 +494,34 @@ sub summary_stats {
 
 	my $vars = $cache->{datasource}->variables();
 
-        my $file = File::Spec->catfile($dir, "SummaryStatistics.csv");
+	my $file = File::Spec->catfile( $dir, "SummaryStatistics.csv" );
 	my $fh = FileHandle->new("> $file")
 	  or throw_cmd_run_exception( error => "Failed to open file: $!" );
 
-	$csv->print($fh, \@cols) or throw_cmd_run_exception( error => $csv->error_diag() );
+	$csv->print( $fh, \@cols )
+	  or throw_cmd_run_exception( error => $csv->error_diag() );
 
 	push my @summary_stats, [@cols];
 
-	my @keys = $cols[0] eq 'Visit' ? sort { $a <=> $b } keys %$data : sort keys %$data;
+	my @keys =
+	  $cols[0] eq 'Visit' ? sort { $a <=> $b } keys %$data : sort keys %$data;
 
 	@cols = $key_index == 0 ? @cols : splice @cols, 1;
 
 	print STDERR "Computing summary statistics for "
 	  . ( $#cols + 1 )
 	  . " query variable(s): "
-	  . join( ', ', @cols ) . " ... \n\n"
+	  . join( ', ', @cols )
+	  . " ... \n\n"
 	  if ( $cache->{verbose} );
 
-      # Key can be Visit, Entity_ID or none depending on the command (i.e. search/compare) run.
-      # For longitudinal datasources the search command computes statistics with respect to visit,
-      # hence the key is 'Visit'. Standard datasources are not visit based so no key is used.
-      # Compare command uses Entity_ID as the key when computing statistics for longitudinal datasources.
-      require Statistics::Descriptive;
+        # Key can be Visit, Entity_ID or none depending on the command (i.e. search/compare) run.
+        # For longitudinal datasources the search command computes statistics with respect to visit,
+        # hence the key is 'Visit'. Standard datasources are not visit based so no key is used.
+        # Compare command uses Entity_ID as the key when computing statistics for longitudinal datasources.
+	require Statistics::Descriptive;
 
-      for my $key (@keys) {
+	for my $key (@keys) {
 		push my @row, ( $key_index == 0 ? () : $key );
 		for my $col (@cols) {
 			my $sdf = Statistics::Descriptive::Full->new();
@@ -508,12 +533,13 @@ sub summary_stats {
 			{
 
 				# Remove single/double quotes (if any) from the numeric array
-				$sdf->add_data( map { s/[\'\"]+//; $_ } @{ $data->{$key}{$col} } );
+				$sdf->add_data( map { s/[\'\"]+//; $_ }
+					  @{ $data->{$key}{$col} } );
 
 				eval {
 					push @row,
 					  sprintf(
-                                                "N: %3s\nMean: %.2f\nMedian: %.2f\nSD: %.2f\nMax: %.2f\nMin: %.2f",
+                        "N: %3s\nMean: %.2f\nMedian: %.2f\nSD: %.2f\nMax: %.2f\nMin: %.2f",
 						$sdf->count(), $sdf->mean(), $sdf->median(),
 						$sdf->standard_deviation(),
 						$sdf->max(), $sdf->min()
@@ -525,7 +551,7 @@ sub summary_stats {
 				}
 			}
 
-                       # Computing statistics for categorical variables with type 'text' and bolean variables only
+                        # Computing statistics for categorical variables with type 'text' and bolean variables only
 			elsif ($vars->{$col}
 				&& $vars->{$col}{type} =~ /^char/i
 				&& $vars->{$col}{category} )
@@ -559,7 +585,8 @@ sub summary_stats {
 			}
 		}
 
-		$csv->print($fh, \@row) or throw_cmd_run_exception( error => $csv->error_diag() );
+		$csv->print( $fh, \@row )
+		  or throw_cmd_run_exception( error => $csv->error_diag() );
 		push @summary_stats, [@row];
 	}
 
@@ -584,9 +611,11 @@ sub process_table { }
 sub get_stats_data { }
 
 END {
-        # Write saved commands to command history file
+
+	# Write saved commands to command history file
 	eval {
-		$COMMAND_HISTORY_CONFIG->save_file( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY );
+		$COMMAND_HISTORY_CONFIG->save_file( $COMMAND_HISTORY_FILE,
+			$COMMAND_HISTORY );
 	};
 
 	if ( catch my $e ) {
