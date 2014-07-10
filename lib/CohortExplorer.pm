@@ -1,9 +1,13 @@
+#!/usr/bin/perl
+
 package CohortExplorer;
+
+use 5.006;
 
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 #-------
 
@@ -21,9 +25,9 @@ B<CohortExplorer [OPTIONS] COMMAND [COMMAND-OPTIONS]>
 
 =head1 DESCRIPTION
 
-CohortExplorer allows a detailed exploration of entities and variables from the clinical data stored under the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software (e.g., i2b2, LabKey, OpenClinica, Opal, REDCap) use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. Because CohortExplorer has a generic framework it is possible to plug-in any clinical data repository following the EAV schema using the L<datasource API|CohortExplorer::Datasource>. CohortExplorer has been tested with L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/>. 
+CohortExplorer provides an abstracted command line search interface to clinical repositories implemented using the Entity-Attribute-Value (EAV) schema also known as the generic schema. Most of the available electronic data capture and management software such as LabKey, OpenClinica, REDCap, Opal and i2b2 use EAV schema as it allows the organisation of heterogeneous data with relatively simple schema. With CohortExplorer's abstracted framework it is possible to 'plug-n-play' with clinical data repositories using the L<datasource API|CohortExplorer::Datasource>. The datasources/projects stored in L<Opal (OBiBa)|http://obiba.org/node/63> and L<REDCap|http://project-redcap.org/> can be queried using the inbuilt APIs (see L<here|http://www.youtube.com/watch?v=Tba9An9cWDY>).
 
-The application makes use of the following concepts to explore clinical repositories within the EAV framework:
+The application makes use of the following concepts to explore clinical data repositories within the EAV framework:
 
 =over 
 
@@ -37,7 +41,7 @@ Datasource which involves observing entities (e.g., the participant or drug) at 
 
 =item B<Longitudinal datasource> 
 
-Datasource which involves a repeated observation of entities over different time-points or visits.
+Datasource which involves a repeated observation of entities over different time-points, visits or events.
 
 =item B<Tables> 
 
@@ -45,21 +49,21 @@ Questionnaires, surveys or forms in a datasource.
 
 =item B<Variables and values> 
  
-The questions, which form part of the study, are called variables and values are answers to the questions. In CohortExplorer a variable is referenced as Table.Variable where table is the questionnaire that records the variable.
+The questions, which form part of the study, are called variables and values are answers to the questions. In CohortExplorer a variable is referenced as a combination of table and variable name where table is the questionnaire that records the variable.
 
 =item B<Static table> 
 
-Questionnaires in a datasource, which record the entity data only once, are grouped under the static table. All tables within standard (or non-longitudinal) datasources are static. However, the longitudinal datasources may also contain some questionnaires that can be grouped under the static table (e.g., Demographics or FamilyHistory).
+Questionnaires which are used only once in the course of the study, are grouped under the static table. All tables within standard (or non-longitudinal) datasources are static. However, the longitudinal datasources may also contain some questionnaires that can be grouped under the static table (e.g., Demographics or FamilyHistory).
       
 =item B<Dynamic table> 
 
-Questionnaires in a datasource, which are used frequently to collate the entity data, are classed under the dynamic table. This table applies only to the longitudinal datasources.
+Questionnaires which are used across multiple time-points in the course of the study are classed under the dynamic table. This table applies only to the longitudinal datasources.
       
 =back
 
 =head1 MOTIVATION
 
-I have not found any query tools that can standardise the EAV schema. All available clinical data capture and management software have their own EAV schema. This poses a problem when two or more research groups collaborate on a project and the collaboration involves data exchange in the form of database dump (anonymised). The research groups may have used a different EAV to store their clinical data. CohortExplorer is an attempt to standardise the entity attribute value model so any clinical respository can be plugged into it thus, enabling the users to browse the datasources using a standard command line search interface.
+I have not found any query tools that can standardise the EAV schema. All available clinical data capture and management software have their own EAV schema. This poses a problem when two or more research groups collaborate on a project and the collaboration involves data exchange in the form of database dump (anonymised). The research groups may have used a different EAV to store their clinical data. CohortExplorer is an attempt to standardise the entity attribute value model so the users can plug-n-play.
 
 In addition, our group's specific query requirements also motivated me to write CohortExplorer.
        
@@ -97,7 +101,7 @@ Datasource description including entity count can be obtained.
         
 =item 8
 
-Allows the user to view summary statistics and export the data on tables in csv format which can be readily parsed in statistical software like R for further analysis.
+Allows the user to view summary statistics and export the data on tables in csv format which can be readily parsed in statistical software like R for downstream analysis.
 
 =item 9
 
@@ -131,7 +135,7 @@ Show with verbosity
 
 =back
 
-B<Note> that the username and password is the same as the parent clinical repository. The command is an argument to CohortExplorer.
+B<Note> that the username and password is the same as the parent clinical data repository. The command is an argument to CohortExplorer.
 
 =head1 COMMANDS 
 
@@ -139,37 +143,37 @@ B<Note> that the username and password is the same as the parent clinical reposi
 
 =item B<describe>
 
-This command outputs the datasource description in a tabular format where the first column is the table name followed by the table attributes (e.g., variable_count, label etc.). The command also displays entity (count) for the specified datasource. For more on this command see L<CohortExplorer::Command::Describe>.
+This command outputs the datasource description in a tabular format where the first column is the table name followed by the table attributes such as label and variable_count. The command also displays entity count for the specified datasource. For more on this command see L<CohortExplorer::Command::Describe>.
       
 =item B<find>
       
-This command enables the user to find variables by supplying keywords. The command outputs the dictionary of variables that are found. The dictionary can include, variable name, table name, unit, categories (if any) and the associated label. For more on this command see L<CohortExplorer::Command::Find>.
+This command enables the user to find variables by supplying keywords. The command prints the dictionary of variables meeting the search criteria. The variable dictionary can include variable attributes such as variable name, table name, unit, categories (if any) and the associated label. For more on this command see L<CohortExplorer::Command::Find>.
       
 =item B<search>
 
-This command enables the user to search for entities by supplying the variables of interest. The user has the liberty to impose conditions on the variables. For more on this command see L<CohortExplorer::Command::Query::Search>.
+This command enables the user to search for entities by supplying the variables of interest. The user can also impose conditions on the variables. For more on this command see L<CohortExplorer::Command::Query::Search>.
       
 =item B<compare>
 
-This command enables the user to compare entities across visits by supplying the variables of interest. The command is only available to the longitudinal datasources.  For more on this command see L<CohortExplorer::Command::Query::Compare>. 
+This command enables the user to compare entities across visits by supplying the variables of interest. The command is only available to the longitudinal datasources. For more on this command see L<CohortExplorer::Command::Query::Compare>. 
       
 =item B<history>
 
-This command enables the user to see the history of saved commands. The user can utilise the existing information (like options and arguments) to build new commands without writing the commands again. For more on this command see L<CohortExplorer::Command::History>.
+This command enables the user to see all previously saved commands. The user can utilise the existing information (like options and arguments) to build new commands without writing the commands again. For more on this command see L<CohortExplorer::Command::History>.
       
 =back
 
 =head1 EXAMPLES
 
- [somebody@somewhere]$ CohortExplorer --datasource=Clinical --username=administrator --password describe (run describe command)
+ [somebody@somewhere]$ CohortExplorer --datasource=Medication --username=admin --password describe (run describe command)
 
- [somebody@somewhere]$ CohortExplorer -v -dClinical -uadministrator -p console (start console in verbose mode)
+ [somebody@somewhere]$ CohortExplorer -v -dMedication -uadmin -p sh (start console in verbose mode)
    
- [somebody@somewhere]$ CohortExplorer -dClinical -uguest -p find -fi cancer diabetes (run find command with aliases)
+ [somebody@somewhere]$ CohortExplorer -dMedication -uadixit -p find -fi cancer diabetes (run find command with aliases)
 
 =head1 SECURITY
 
-When setting CohortExplorer for group use it is recommended to install the application using its debian package which is part of the release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
+When setting CohortExplorer for group use it is recommended to install the application using its debian package which is part of each release. The package greatly simplifies the installation and implements the security mechanism. The security measures include:
 
 =over
 
@@ -185,7 +189,7 @@ disabling the access to configuration files and log file to users other than the
 
 =head1 BUGS
 
-Currently the application does not support the querying of datasources with multiple arms. The application is only tested with clinical repositories using MySQL and is yet to be tested with repositories set-up using Oracle and Microsoft SQL Server. Please report any bugs or feature requests to adixit@cpan.org.
+Currently the application does not support the querying of datasources with multiple arms. The application is only tested with clinical data repositories implemented in MySQL and is yet to be tested with repositories implemented in Oracle, PostgreSQL and Microsoft SQL Server. Please report any bugs or feature requests to adixit@cpan.org.
 
 =head1 DEPENDENCIES
 

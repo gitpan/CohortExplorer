@@ -3,7 +3,7 @@ package CohortExplorer::Command::History;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -32,33 +32,39 @@ sub validate {
 
 	my ( $self, $opts, @args ) = @_;
 
-	throw_cmd_validation_exception(
-		error => "Specified arguments when none required" )
-	  if (@args);
+	if (@args) {
+		throw_cmd_validation_exception(
+			error => "Specified arguments when none required" );
+	}
 
-	throw_cmd_validation_exception( error =>
-		  "Specified mutually exclusive options (show and clear) together" )
-	  if ( $opts->{show} && $opts->{clear} );
-
+	if ( $opts->{show} && $opts->{clear} ) {
+		throw_cmd_validation_exception( error =>
+			  "Specified mutually exclusive options (show and clear) together"
+		);
+	}
 }
 
 sub run {
 
 	my ( $self, $opts, @args ) = @_;
-	my $alias = $self->cache->get('cache')->{datasource}->alias();
+	my $alias = $self->cache->get('cache')->{datasource}->alias;
 	my @saved_commands =
 	  sort { $a <=> $b } keys %{ $COMMAND_HISTORY->{datasource}{$alias} };
 
-	# Shows all saved commands for the current datasource
+	# Shows all saved commands for the current datasource along with datetime
 	if ( $opts->{show} && @saved_commands ) {
-		push my @rows, [qw/Command_No Command/];
+		push my @rows, [qw/command_no datetime command/];
 		for (@saved_commands) {
 			push @rows,
-			  [ $_, $COMMAND_HISTORY->{datasource}{$alias}{$_}{command} ];
+			  [
+				$_,
+				@{ $COMMAND_HISTORY->{datasource}{$alias}{$_} }
+				  {qw/datetime command/}
+			  ];
 
 		}
 
-		print STDERR "Rendering command history ..." . "\n\n"
+		print STDERR "\nRendering command history ...\n\n"
 		  if ( $self->cache->get('cache')->{verbose} );
 
 		return {
@@ -114,7 +120,7 @@ This method throws C<throw_cmd_validation_exception> exception imported from L<C
 
 =item *
 
-arguments are supplied to this command as this command does not accept any arguments, or
+arguments are supplied to this command because this command does not accept any arguments, or
 
 =item *
 

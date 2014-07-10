@@ -3,7 +3,7 @@ package CohortExplorer::Command::Menu;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw( CLI::Framework::Command::Menu );
 
@@ -11,25 +11,26 @@ use base qw( CLI::Framework::Command::Menu );
 
 sub menu_txt {
 
-    my ($self) = @_;
+	my ($self) = @_;
 
-    my $app = $self->get_app();
+	my $app = $self->get_app;
 
-    # Build a list of valid and visible commands with aliases ...
-    my ( @cmd, $txt );
+	my ( @cmd, $txt );
 
-    for my $cmd ( $app->get_interactive_commands() ) {
+	# Get all valid commands
+	for my $c ( $app->get_interactive_commands ) {
+		if ( grep ( $_ ne $c, $app->noninteractive_commands ) ) {
+			push @cmd, $c;
+		}
+	}
 
-        push @cmd, $cmd
-          unless grep( /^$cmd$/, $app->noninteractive_commands() );
+	my %aliases = reverse $app->command_alias;
 
-    }
-
-    my %aliases = reverse $app->command_alias();
-    for (@cmd) {
-        $txt .= sprintf( "%-5s%2s%10s\n", $aliases{$_}, '-', $_ );
-    }
-    return "\n\n" . $txt . "\n\n";
+	# Create menu txt which contains all valid commands with their aliases
+	for (@cmd) {
+		$txt .= sprintf( "%-5s%2s%10s\n", $aliases{$_}, '-', $_ );
+	}
+	return "\n\n" . $txt . "\n\n";
 }
 
 #-------
@@ -49,6 +50,6 @@ This class is inherited from L<CLI::Framework::Command::Menu> and overrides C<me
 
 =head2 menu_txt()
 
-This method creates a command menu including the commands that are available to the running application. Only a small modification has been made to the original code so that the menu includes command aliases along with the command names.
+This method creates a command menu including the commands that are available to the running application. Only a small modification has been made to the original code so that the menu includes command aliases with command names.
 
 =cut

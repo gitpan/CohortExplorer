@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -13,21 +13,20 @@ use Exception::Class::TryCatch;
 
 sub usage_text {
 
-      q{
-         find [--fuzzy|f] [--ignore-case|i] [--and|a] [keyword] : find variables using keywords
+	q{
+           find [--fuzzy|f] [--ignore-case|i] [--and|a] [keyword] : find variables using keywords
 
          
-         By default, the arguments/keywords are joined using 'OR' unless option 'and' is specified.
+           By default, the command returns variables that contain either of the keywords in at least one of their attributes.
+           The user can override this setting by specifying the 'and' option.
 
-         EXAMPLES
+           EXAMPLES
              
-             find --fuzzy --ignore-case cancer diabetes  (fuzzy and case insensitive search)
+             find --fuzzy --ignore-case cancer diabetes mmhg  (fuzzy and case insensitive search)
 
              find Demographics  (exact search)
 
-             find -fi mmHg  (options with bundling and aliases)
-
-             find -fia mmse total (using AND operation)
+             find -fia mmse total (using AND operation with bundling and aliases)
         };
 }
 
@@ -37,7 +36,8 @@ sub option_spec {
 		[],
 		[ 'ignore-case|i' => 'ignore case' ],
 		[ 'fuzzy|f'       => 'fuzzy search' ],
-		[], [ 'and|a' => 'Join keywords using AND (default OR)' ], []
+		[], [ 'and|a' => 'Join keywords using AND (default OR)' ], 
+		[]
 	);
 }
 
@@ -45,27 +45,43 @@ sub validate {
 
 	my ( $self, $opts, @args ) = @_;
 
-	throw_cmd_validation_exception(
-		error => "At least one argument is required" )
-	  unless (@args);
+	if ( @args == 0 ) {
+		throw_cmd_validation_exception(
+			error => "At least one argument is required" );
+	}
 }
 
 sub run {
 
 	my ( $self, $opts, @args ) = @_;
-	my $datasource = $self->cache->get('cache')->{datasource};
-	my $verbose    = $self->cache->get('cache')->{verbose};
+	my ( $ds, $verbose ) =
+	  @{ $self->cache->get('cache') }{qw/datasource verbose/};
 	my $oper = $opts->{ignore_case} ? -like : 'like binary';
-	@args = map { uc $_ } @args    if ( $opts->{ignore_case} );
-	@args = map { "\%$_\%" } @args if ( $opts->{fuzzy} );
 
-	eval 'require ' . ref $datasource;    # May or may not be preloaded
+	# Convert all arguments to upper case for case insensitive match
+	@args = map { uc $_ } @args if ( $opts->{ignore_case} );
 
-	my ( $stmt, @bind, $sth );
+	# Add wildcard characters to each argument for fuzzy matching
+	@args = map { '%' . $_ . '%' } @args if ( $opts->{fuzzy} );
 
-        # Build a query to search variables based on keywords
-        # Look for presence of keywords in -columns specified under $datasource->variable_structure method
-	my $struct = $datasource->variable_structure();
+	# May or may not be preloaded
+	eval 'require ' . ref $ds;
+
+	# Get variable structure
+	my $struct = $ds->variable_structure;
+
+	# Get column names-SQL pairs
+	my $map = $ds->variable_columns;
+
+	# Set the condition key to be used
+	my $condition_key = $struct->{-group_by} ? -having : -where;
+
+	# Get the existing 'OR' within $struct (if any)
+	my $OR_condition = $struct->{$condition_key}{-or};
+
+        # By default assume the user is interested in finding variables which contain at least one of the
+        # supplied keywords in at least one of the variable attributes
+        # If there is already a 'OR' within $struct->{$condition_key} then merge two conditions
 
 	$struct->{ $struct->{-group_by} ? -having : -where }{-or} = [
 		map {
@@ -78,26 +94,41 @@ sub run {
 			}
 
 		  } $struct->{-group_by}
-		? map { "`$_`" } keys %{ $struct->{-columns} }
-		: values %{ $struct->{-columns} }
+		? map { "`$_`" } keys %$map
+		: values %$map
 	];
 
-        # 'variable' and 'table' are the first two columns followed by variable attributes
-	my @columns = (
-		qw/table variable/,
-		grep ( !/^(table|variable)$/, keys %{ $struct->{-columns} } )
-	);
+	# Do a merger of old and new 'OR'
+	if ($OR_condition) {
+		$struct->{$condition_key}{-or} =
+		  $struct->{$condition_key}
+		  { [ -or => $struct->{$condition_key}{-or}, $OR_condition ] };
+	}
 
-	$struct->{-columns} =
-	  [ map { $struct->{-columns}{$_} . "|`$_`" } @columns ];
+	# Set table and variable as first two columns
+	push my @column, qw/variable table/;
 
-	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
+	for ( keys %$map ) {
+		if ( $_ ne 'variable' && $_ ne 'table' ) {
+			push @column, $_;
+		}
+	}
+
+	# Format column name-SQL pairs along the lines of columns in
+	# SQL::Abstract::More
+	$struct->{-columns} = [ map { "$map->{$_}|`$_`" } @column ];
+
+	##----- SQL TO FETCH VARIABLE DATA -----##
+
+	my ( $stmt, @bind, $sth, $row );
+
+	eval { ( $stmt, @bind ) = $ds->sqla->select(%$struct); };
 
 	if ( catch my $e ) {
 		throw_cmd_run_exception( error => $e );
 	}
 
-	# Modifying query
+        # Modify query to allow case insensitve search for tables that store metadata in EAV format (e.g. Opal)
 	my $order_by = $1 if ( $stmt =~ /(ORDER BY\s+.+)$/ );
 	$stmt =~ s/ORDER BY .+$//;
 
@@ -106,41 +137,39 @@ sub run {
 
 	$stmt .= $order_by;
 	$stmt =
-	    "SELECT "
-	  . join( ', ', map { "`$_`" } @columns )
-	  . " FROM ( $stmt ) AS custom WHERE $where ";
+	    'SELECT '
+	  . join( ', ', map { "`$_`" } @column )
+	  . " FROM ( $stmt ) AS custom ";
+	$stmt .= "WHERE $where " if ($where);
 
 	eval {
-		$sth = $datasource->dbh->prepare_cached($stmt);
-		$sth->execute(@bind);
+		$row = $ds->dbh->selectall_arrayref( $stmt, undef, @bind );
+
 	};
 
 	if ( catch my $e ) {
 		throw_cmd_run_exception( error => $e );
 	}
 
-	push my @rows, ( $sth->{NAME}, @{ $sth->fetchall_arrayref( [] ) } )
-	  if ( $sth->rows );
+	if (@$row) {
 
-	$sth->finish();
-
-	if (@rows) {
+		# Add column names
+		unshift @$row, [@column];
 
 		print STDERR
-		  "Found $#rows variable(s) matching the find query criteria ..."
-		  . "\n\n"
-		  . "Rendering variable description ..." . "\n\n"
+		  "\nFound $#$row variable(s) matching the find query criteria ...\n\n"
+		  . "Rendering variable description ...\n\n"
 		  if ($verbose);
 
 		return {
 			headingText => 'variable description',
-			rows        => \@rows
+			rows        => $row
 		};
 	}
 
 	else {
-		print STDERR "Found 0 variable(s) matching the find query criteria ..."
-		  . "\n\n"
+		print STDERR
+		  "\nFound 0 variable(s) matching the find query criteria ...\n\n"
 		  if ($verbose);
 
 		return undef;
@@ -187,7 +216,7 @@ Validates the command options and arguments and throws exception if validation f
 
 =head2 run( $opts, @args )
 
-This method  enables the user to search variables using keywords. The command looks for the presence of keywords in the columns specified under L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the inherited datasource class. The command attempts to output the variable dictionary (i.e. meta data) of variables that are found. The variable dictionary can include the following variable attributes:
+This method enables the user to search variables using keywords. The command looks for the presence of keywords in columns specified in L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the sub class. The command attempts to print the variable dictionary (i.e. meta data) of variables meeting the search criteria. The variable dictionary can include the following variable attributes:
 
 =over
 
@@ -209,7 +238,7 @@ unit
 
 =item 5
 
-categories (if any)
+categories (if any) separated by newline 
 
 =item 6
 
@@ -243,13 +272,13 @@ This command throws the following exceptions imported from L<CLI::Framework::Exc
 
 =item 1
 
-C<throw_cmd_run_exception>: This exception is thrown if one of the following conditions are met,
+C<throw_cmd_run_exception>: This exception is thrown if one of the following conditions are met:
 
 =over
 
 =item *
 
-The C<select> method from L<SQL::Abstract::More> fails to construct the SQL from the supplied hash ref.
+The C<select> method from L<SQL::Abstract::More> fails to construct the SQL query from the supplied hash ref.
 
 =item *
 
@@ -259,7 +288,7 @@ The method C<execute> from L<DBI> fails to execute the SQL query.
 
 =item 2
 
-C<throw_cmd_validation_exception>: This exception is thrown only if no arguments (i.e. keywords) are supplied because this command requires at least one argument.
+C<throw_cmd_validation_exception>: This exception is thrown if the user has not supplied any arguments/keywords to the command. The command expects at least one argument.
 
 =back
 
@@ -278,13 +307,11 @@ L<SQL::Abstract::More>
 
 =head1 EXAMPLES
 
- find --fuzzy --ignore-case cancer diabetes (fuzzy and case insensitive search)
+ find --fuzzy --ignore-case cancer diabetes mmhg (fuzzy and case insensitive search)
 
  find Demographics (exact search)
 
- find -fi mmHg (options with bundling and aliases)
-
- find -fia mmse total (using AND operation)
+ find -fia mmse total (using AND operation with bundling and aliases)
 
 
 =head1 SEE ALSO
@@ -311,7 +338,8 @@ This program is free software: you can redistribute it and/or modify it under th
 =over
 
 =item *
-the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version, or
+the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version, or
 
 =item *
 the "Artistic Licence".

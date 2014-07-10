@@ -3,7 +3,7 @@ package CohortExplorer::Command::Describe;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -12,9 +12,9 @@ use CLI::Framework::Exceptions qw( :all );
 
 sub usage_text {
 
-	    q{
-               describe : show datasource description including entity count 
-             };
+	 q{
+            describe : show datasource description including the entity count 
+          };
 
 }
 
@@ -22,9 +22,10 @@ sub validate {
 
 	my ( $self, $opts, @args ) = @_;
 
-	throw_cmd_validation_exception(
-		error => 'Specified arguments when none required' )
-	  if (@args);
+	if (@args) {
+		throw_cmd_validation_exception(
+			error => 'Specified arguments when none required' );
+	}
 
 }
 
@@ -34,29 +35,35 @@ sub run {
 
 	my $cache = $self->cache->get('cache');
 
-	eval 'require ' . ref $cache->{datasource};    # May or may not be preloaded
+	# May or may not be preloaded
+	eval 'require ' . ref $cache->{datasource};
 
-	my $tables = $cache->{datasource}->tables();
+	my $tables = $cache->{datasource}->tables;
 
-        # Get all accessible tables in the datasource with 'table' as the first column followed by table attributes
-	my @columns = (
-		'table',
-		grep ( !/^table$/, keys %{ $tables->{ ( keys %$tables )[-1] } } )
-	);
+	# Get all table attributes using the last key in $tables
+	# The first column is always table name
+	push my @column, 'table';
 
-	push my @rows, \@columns;
-	for my $table ( keys %$tables ) {
-		push @rows,
-		  [ map { $tables->{$table}{ $rows[0]->[$_] } } 0 .. $#{ $rows[0] } ];
+	for ( keys %{ $tables->{ ( keys %$tables )[-1] } } ) {
+		if ( $_ ne 'table' ) {
+			push @column, $_;
+		}
 	}
 
-	print STDERR "Rendering datasource description ..." . "\n\n"
+	push my @rows, \@column;
+
+	for my $t ( keys %$tables ) {
+		push @rows,
+		  [ map { $tables->{$t}{ $rows[0]->[$_] } } 0 .. $#{ $rows[0] } ];
+	}
+
+	print STDERR "\nRendering datasource description ...\n\n"
 	  if ( $cache->{verbose} );
 
 	return {
-		headingText => $cache->{datasource}->name()
+		headingText => $cache->{datasource}->name
 		  . ' datasource description ('
-		  . $cache->{datasource}->entity_count()
+		  . $cache->{datasource}->entity_count
 		  . ' entities)',
 		rows => \@rows
 	};
@@ -71,7 +78,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Describe - CohortExplorer class to describe the datasource
+CohortExplorer::Command::Describe - CohortExplorer class to describe datasource
 
 =head1 SYNOPSIS
 
@@ -89,11 +96,11 @@ This method returns the usage information for the command.
 
 =head2 validate( $opts, @args )
 
-This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exceptions> if an argument is supplied to this command because this command does not accept any arguments.
+This method throws C<throw_cmd_validation_exception> exception imported from L<CLI::Framework::Exceptions> if the user has supplied arguments to this command.
 
 =head2 run( $opts, @args )
 
-This method attempts to retrieve the table information and entity (count) from the datasource class and returns them to L<CohortExplorer::Application>.
+This method attempts to retrieve the table information and the entity count from the datasource class and returns them to L<CohortExplorer::Application>.
 
 =head1 DEPENDENCIES
 
@@ -124,7 +131,8 @@ This program is free software: you can redistribute it and/or modify it under th
 =over
 
 =item *
-the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version, or
+the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version, or
 
 =item *
 the "Artistic Licence".

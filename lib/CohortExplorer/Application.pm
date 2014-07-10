@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -17,42 +17,42 @@ use Term::ReadKey;
 sub usage_text {
 
 	q{
-                    CohortExplorer
+           CohortExplorer
 
-                    OPTIONS
-                            -d  --datasource  : provide datasource
-                            -u  --username    : provide username
-                            -p  --password    : provide password
+           OPTIONS
+              -d  --datasource  : provide datasource
+              -u  --username    : provide username
+              -p  --password    : provide password
 
-                            -v  --verbose     : show with verbosity
-                            -h  --help        : show usage message and exit
+              -v  --verbose     : show with verbosity
+              -h  --help        : show usage message and exit
                             
 
-                    COMMANDS
-                             help      - show application or command-specific help
-                             menu      - show menu of available commands
-                             search    - search entities with/without conditions on variables
-                             compare   - compare entities across visits (applicable only to longitudinal datasources)
-                             describe  - show datasource description including entity count 
-                             history   - show saved commands
-                             find      - find variables using keywords 
-                             console   - start a command console for the application
+            COMMANDS
+               help      - show application or command-specific help
+               menu      - show menu of available commands
+               console   - start a command console for the application
+               describe  - show datasource description including the entity count 
+               find      - find variables using keywords 
+               search    - search entities with/without conditions on variables
+               compare   - compare entities across visits (valid to longitudinal datasources with data on at least 2 visits)
+               history   - show saved commands
             
- };
+         };
 }
 
 sub option_spec {
 
-	# Username, password and datasource name are mandatory options
-	# Password may or may not be provided at start
-	[],
-	[ 'datasource|d:s' => 'provide datasource' ],
-	[ 'username|u:s'   => 'provide username' ],
-	[ 'password|p:s'   => 'provide password' ],
-	[],
-	[ 'verbose|v' => 'show with verbosity' ],
-	[ 'help|h'    => 'show usage message and exit' ],
-	[]
+	  # Username, password and datasource name are mandatory options
+	  # Password may or may not be provided at start
+	  [],
+	  [ 'datasource|d:s' => 'provide datasource' ],
+	  [ 'username|u:s'   => 'provide username' ],
+	  [ 'password|p:s'   => 'provide password' ],
+	  [],
+	  [ 'verbose|v' => 'show with verbosity' ],
+	  [ 'help|h'    => 'show usage message and exit' ],
+	  []
 
 }
 
@@ -60,13 +60,15 @@ sub validate_options {
 
 	my ( $app, $opts ) = @_;
 
-	# Show help and exit ...
+	# Show help and exit
 	if ( $opts->{help} || keys %$opts == 0 ) {
-		$app->render( $app->get_default_usage() );
+		$app->render( $app->get_default_usage );
 		exit;
 	}
 
 	else {
+
+		# Throw exception if mandatory options are missing
 		if (   !$opts->{datasource}
 			|| !$opts->{username}
 			|| !exists $opts->{password} )
@@ -92,7 +94,7 @@ sub command_map {
 
 sub command_alias {
 
-	h      => 'help',
+	  h    => 'help',
 	  m    => 'menu',
 	  s    => 'search',
 	  c    => 'compare',
@@ -106,60 +108,80 @@ sub noninteractive_commands {
 
 	my ($app) = @_;
 
-	my $datasource = $app->cache->get('cache')->{datasource};
+	my $ds = $app->cache->get('cache')->{datasource};
 
-	eval 'require ' . ref $datasource;    # May or may not be preloaded
+	# May or may not be preloaded
+	eval 'require ' . ref $ds;
 
 	# Menu and console commands are invalid under interactive mode
-	push my @noninteractive_commands, qw/menu console/;
+	push my @noninteractive_command, qw/menu console/;
 
-        # Search, compare and history commands require the user to have access to at least one variable
-	push @noninteractive_commands, qw/search history compare/
-	  unless ( keys %{ $datasource->variables() } );
+	# search, compare and history commands are invalid if the user
+	# does not have access to any variable
+	if ( keys %{ $ds->variables } == 0 ) {
+		push @noninteractive_command, qw/search history compare/;
+	}
 
-	# Compare command is only available to longitudinal datasources
-	push @noninteractive_commands, 'compare'
-	  unless ( $datasource->type() eq 'longitudinal' );
+	# Compare command is invalid if 
+	# datasource type is standard/cross-sectional
+	# visit_max is undefined or less than 2
+	if ( $ds->type ne 'longitudinal' || !$ds->visit_max || $ds->visit_max < 2 )
+	{
+		push @noninteractive_command, 'compare';
+	}
 
-	return @noninteractive_commands;
+	return @noninteractive_command;
 }
 
 sub render {
 
 	my ( $app, $output ) = @_;
 
-        # Output from commands (excluding help) is hash with keys headingText and rows
-        # headingText = a scalar with table heading
-        # rows = ref to array of arrays
+        # All commands except help return hash where key is headingText (table heading)
+        # and value is ref to array of arrays containing column values
 	if ( ref $output eq 'HASH' ) {
 		require Text::ASCIITable;
-		my $table = Text::ASCIITable->new(
+
+		my $t = Text::ASCIITable->new(
 			{
 				hide_Lastline => 1,
 				reportErrors  => 0,
+				drawRowLine   => 1,
 				headingText   => $output->{headingText}
 			}
 		);
 
-		my @cols = @{ shift @{ $output->{rows} } };
+		my @col = @{ shift @{ $output->{rows} } };
 
-		# Format table on the basis of command output
 		my $colWidth = $output->{headingText} eq 'command history' ? 1000 : 30;
 
-		$table->setCols(@cols);
+		$t->setCols(@col);
 
-		for (@cols) {
-			$table->setColWidth( $_, $colWidth );
+		for (@col) {
+			$t->setColWidth( $_, $colWidth );
 		}
 
-		for my $row ( @{ $output->{rows} } ) {
+		# Prevent truncation by inserting space at every $colWidth character
+		for my $r ( @{ $output->{rows} } ) {
 			my @row = map {
 				substr( $_, ( $colWidth - 1 ), 0 ) = ' '
 				  if ( $_ && $_ =~ /^[^\n]+$/ && length $_ >= $colWidth );
 				$_
-			} @$row;
-			$table->addRow(@row);
+
+			} @$r;
+			$t->addRow(@row);
 		}
+
+		(
+			my $table = $t->draw(
+				[ '', '', '', '' ],
+				[ '', '', '' ],
+				[ '', '', '', '' ],
+				[ '', '', '' ],
+				[ '', '', '', '' ],
+				[ '', '', '', '' ]
+			)
+		) =~ s/\|//g;
 
 		if ( $^O eq 'linux' ) {
 			delete @ENV{qw(PATH)};
@@ -175,6 +197,7 @@ sub render {
 		else {
 			print "\n" . $table . "\n";
 		}
+
 	}
 
 	else {
@@ -188,14 +211,27 @@ sub handle_exception {
 
 	my ( $app, $e ) = @_;
 
-	print $app->render( $e->description() . "\n\n" . $e->error() . "\n\n" );
-
 	my $cache = $app->cache->get('cache');
 
-	# Logs exceptions
-	$cache->{logger}
-	  ->error( $e->description() . ' [ User: ', $cache->{user} . ' ]' )
-	  if ($cache);
+	if (  !$cache
+		|| $e->isa('CLI::Framework::Exception::CmdValidationException') )
+	{
+
+		# Print command validation errors for the users
+		$app->render( $e->description . "\n\n" . $e->error . "\n\n" );
+	}
+
+	else
+	{ # Print application initialization related errors (source CohortExplorer::Datasource)
+		$app->render( $e->description . "\n\n" );
+
+	}
+
+	# Log all other errors
+	if ($cache) {
+		$cache->{logger}
+		  ->error( $e->error . ' [ User: ', $cache->{user} . ' ]' );
+	}
 
 	return;
 }
@@ -206,15 +242,16 @@ sub pre_dispatch {
 
 	my $cache = $app->cache->get('cache');
 
-	my @invalid_commands =
-	  grep ( /^(search|compare|history)$/, $app->noninteractive_commands() );
+	my @invalid_command =
+	  grep ( /^(search|compare|history)$/, $app->noninteractive_commands );
 
-	my $current_command = $app->get_current_command();
+	my $current_command = $app->get_current_command;
 
-	# Invalid commands are not allowed to dispatch
-	throw_invalid_cmd_exception(
-		error => "Invalid command: " . $current_command . "\n" )
-	  if ( grep( /^$current_command$/, @invalid_commands ) );
+	# Don't allow invalid commands to dispatch
+	if ( grep( $_ eq $current_command, @invalid_command ) ) {
+		throw_invalid_cmd_exception(
+			error => "Invalid command: " . $current_command . "\n" );
+	}
 
 	# Log user activity
 	$cache->{logger}
@@ -239,7 +276,7 @@ sub read_cmd {
 		# Arrange for command-line completion
 		my $attribs = $term->Attribs;
 		$term->ornaments(0);
-		$attribs->{completion_function} = $app->_cmd_request_completions();
+		$attribs->{completion_function} = $app->_cmd_request_completions;
 	}
 
 	# Prompt for the name of a command and read input from STDIN
@@ -251,7 +288,7 @@ sub read_cmd {
 	if ( !defined $command_request ) {
 
 		# Interpret CTRL-D (EOF) as a quit signal
-		@ARGV = $app->quit_signals();
+		@ARGV = $app->quit_signals;
 		print "\n";    # since EOF character is rendered as ''
 	}
 	else {
@@ -273,8 +310,8 @@ sub _cmd_request_completions {
 	return sub {
 
 		my ( $text, $line, $start ) = @_;
-		my $datasource      = $app->cache->get('cache')->{datasource};
-		my $datasource_type = $datasource->type();
+		my $ds      = $app->cache->get('cache')->{datasource};
+		my $ds_type = $ds->type;
 
 		# Listen to search/compare commands
 		if ( $line =~ /^\s*(search|compare|find|history|[scf]|hist)\s+/ ) {
@@ -287,14 +324,14 @@ sub _cmd_request_completions {
 			$cmd = 'history' if ( $cmd eq 'hist' );
 
 			# Ensure search/compare/history/find are valid commands
-			unless ( !$app->is_interactive_command($cmd) ) {
+			if ( $app->is_interactive_command($cmd) ) {
 
 				# Listen to options
 				if ( $text =~ /^\s*\-/ ) {
-					return qw(--show --clear)        if ( $cmd eq 'history' );
-					return qw(--fuzzy --ignore-case) if ( $cmd eq 'find' );
-					return
-					  qw(--out --cond --save-command --stats --export --export-all)
+					return qw(--show --clear) if ( $cmd eq 'history' );
+					return qw(--fuzzy --ignore-case --and) if ( $cmd eq 'find' );
+					return qw(--out --cond --save-command --stats --export --export-all)
+
 					  if ( $cmd =~ /^(search|compare)$/ );
 
 				}
@@ -302,51 +339,51 @@ sub _cmd_request_completions {
 				if ( $cmd =~ /^(search|compare)$/
 					&& substr( $line, 0, $start - 1 ) =~ /(\-o|\-\-out)\s*$/ )
 				{
-					return File::HomeDir->my_home();
+					return File::HomeDir->my_home;
 				}
 
 				if ( $cmd =~ /^(search|compare)$/
 					&& substr( $line, 0, $start - 1 ) =~
 					/(\-e|\-\-export)\s*$/ )
 				{
-					return keys %{ $datasource->tables() };
+					return keys %{ $ds->tables };
 				}
 
 				if ( $cmd eq 'search'
 					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
 				{
-					return map { $_ . "=\"{'opr','val'}\"" } (
-						$datasource_type eq 'standard'
-						? qw(Entity_ID)
-						: qw(Entity_ID Visit)
+					return map { $_ . "='opr, val'" } (
+						$ds_type eq 'standard'
+						? qw(entity_id)
+						: qw(entity_id visit)
 					  ),
-					  keys %{ $datasource->variables() };
+					  keys %{ $ds->variables };
 				}
 
 				if ( $cmd eq 'compare'
 					&& substr( $line, 0, $start - 1 ) =~ /(\-c|\-\-cond)\s*$/ )
 				{
-					return map { $_ . "=\"{'opr','val'}\"" } (
-						qw(Entity_ID),
-						keys %{ $datasource->variables() },
-						@{ $datasource->visit_variables() || [] }
+					return map { $_ . "='opr, val'" } (
+						qw(entity_id),
+						keys %{ $ds->variables },
+						@{ $ds->visit_variables || [] }
 					);
 				}
 
 				# Listen to arguments
 				else {
 					if ( $cmd eq 'search' ) {
-						return keys %{ $datasource->variables() };
+						return keys %{ $ds->variables };
 					}
 
 					elsif ( $cmd eq 'find' ) {
-						return keys %{ $datasource->tables() };
+						return keys %{ $ds->tables };
 					}
 
 					elsif ( $cmd eq 'compare' ) {
 						return (
-							keys %{ $datasource->variables() },
-							@{ $datasource->visit_variables() || [] }
+							keys %{ $ds->variables },
+							@{ $ds->visit_variables || [] }
 						);
 					}
 					else {
@@ -357,13 +394,13 @@ sub _cmd_request_completions {
 		}
 
 		# help command
-		return $app->get_interactive_commands() if ( $line =~ /^\s*help/ );
+		return $app->get_interactive_commands if ( $line =~ /^\s*help/ );
 
 		# describe command
 		return undef if ( $line =~ /^\s*describe/ );
 
 		# default
-		return $app->get_interactive_commands() if ( $line =~ /^\s*/ );
+		return $app->get_interactive_commands if ( $line =~ /^\s*/ );
 
 	  }
 }
@@ -378,23 +415,22 @@ sub init {
 
 	# Path to log configuration file
 	my $log_config_file = File::Spec->catfile(
-		File::Spec->rootdir(), 'etc',
-		'CohortExplorer',      'log-config.properties'
+		File::Spec->rootdir, 'etc',
+		'CohortExplorer',    'log-config.properties'
 	);
 
-	# Initialise logger
+	# initialize logger
 	eval { Log::Log4perl::init($log_config_file); };
 
 	if ( catch my $e ) {
 		throw_app_init_exception( error => $e );
 	}
 
-	my $logger = Log::Log4perl->get_logger();
+	my $logger = Log::Log4perl->get_logger;
 
-	# Check command history file
+	# Check command history file exists and is readable and writable
 	my $command_history_file =
-	  File::Spec->catfile( File::HomeDir->my_home(),
-		".CohortExplorer_History" );
+	  File::Spec->catfile( File::HomeDir->my_home, ".CohortExplorer_History" );
 
 	if ( !-r $command_history_file || !-w $command_history_file ) {
 		throw_app_init_exception( error =>
@@ -403,14 +439,14 @@ sub init {
 	}
 
 	# Prompt for password if not provided at command line
-	unless ( $opts->{password} ) {
+	if ( !$opts->{password} ) {
 		$app->render("Enter password: ");
 		ReadMode 'noecho';
-		$opts->{password} = ReadLine(60);
+		$opts->{password} = ReadLine(300);
 		ReadMode 'normal';
 		$app->render("\n");
 
-		unless ( $opts->{password} ) {
+		if ( !$opts->{password} ) {
 			$app->render("timeout\n");
 			exit;
 		}
@@ -419,27 +455,39 @@ sub init {
 	chomp $opts->{password};
 
 	# Path to datasource configuration file
-	my $datasource_config_file = File::Spec->catfile(
-		File::Spec->rootdir(), 'etc',
-		'CohortExplorer',      'datasource-config.properties'
+	my $ds_config_file = File::Spec->catfile(
+		File::Spec->rootdir, 'etc',
+		'CohortExplorer',    'datasource-config.properties'
 	);
 
-	# Initialise the datasource and store in cache for further use
+	require Text::CSV_XS;
+
+        # initialize the datasource and store the datasource object along with other bits
+        # in cache for further use
 	$app->cache->set(
 		cache => {
-			verbose    => $opts->{verbose},
-			user       => $opts->{username} . '@' . $opts->{datasource},
-			logger     => $logger,
-			datasource => CohortExplorer::Datasource->initialise(
-				$opts, $datasource_config_file
+			datasource =>
+			  CohortExplorer::Datasource->initialize( $opts, $ds_config_file ),
+			verbose => $opts->{verbose},
+			user    => $opts->{username} . '@' . $opts->{datasource},
+			logger  => $logger,
+			csv     => Text::CSV_XS->new(
+				{
+					'quote_char'  => '"',
+					'escape_char' => '"',
+					'sep_char'    => ',',
+					'binary'      => 1,
+					'auto_diag'   => 1,
+					'eol'         => $/
+				}
 			)
 		}
 	);
 
-	if ( $app->get_current_command() eq 'console' ) {
+	if ( $app->get_current_command eq 'console' ) {
 
 		$app->render(
-			    "Welcome to the CohortExplorer version $VERSION console." . "\n\n"
+			"Welcome to the CohortExplorer version $VERSION console." . "\n\n"
 			  . "Type 'help <COMMAND>' for command specific help." . "\n"
 			  . "Use tab for command-line completion and ctrl + L to clear the screen."
 			  . "\n"
@@ -499,7 +547,7 @@ This method returns the mapping between command names and command classes
 
 =head2 command_alias()
 
-This method returns command alias
+This method returns mapping between command aliases and command names
 
   h    => 'help',
   m    => 'menu',
@@ -512,15 +560,15 @@ This method returns command alias
 
 =head2 pre_dispatch( $command )
 
-This method ensures the invalid commands do not dispatch and logs the commands dispatched by the users.
+This method ensures invalid commands do not dispatch and logs all commands dispatched successfully.
 
 =head2 noninteractive_commands()
 
-The method returns a list of the valid commands under interactive mode. The commands search, compare and history can be invalid as they are application dependent because they require the user to have access to at least one variable from the datasource and also depend on the datasource type.
+The method returns a list of valid commands under interactive mode. The commands search, compare and history can be invalid because they are application dependent. These commands require the user to have access to at least one variable from the datasource and also depend on the datasource type. The compare command is only available to longitudinal datasources with data on at least 2 visits.
  
 =head2 render( $output )
 
-This method is responsible for the presentation of the command output. All commands except help produce a tabular output.
+This method is responsible for the presentation of the command output. The output from all commands except help is organised into a table.
 
 =head2 read_cmd( )
 
@@ -528,22 +576,21 @@ This method attempts to provide the autocompletion of options and arguments wher
 
 =head2 handle_exception( $e )
 
-This method prints and logs all exceptions.
+This method prints and logs exceptions.
  
 =head2 init( $opts )
 
-This method is responsible for the initialising of the application which includes initialising the logger and the datasource
-object. 
+This method is responsible for the application initialization which includes prompting the user to enter password if not already supplied and initializing the logger and the datasource.
 
 =head2 OPERATIONS
 
-This class attempts to perform the following operations upon successful initialisation of the datasource:
+This class attempts to perform the following operations upon successful initialization of the datasource:
 
 =over
 
 =item 1
 
-Prints a menu of available command based on the datasource type. For standard (i.e. non-longitudinal) datasource the command menu includes describe, find, search, history and help where as, the longitudinal datasources have also access to the compare command. The search, compare and history commands require the user to have access to at least one variable from the datasource. Steps 1 and 2 are skipped when the application is running in command-line mode.
+Prints a menu of available commands based on the datasource type.
 
 =item 2
 
@@ -559,7 +606,7 @@ Logs exceptions (if any) thrown by the commands.
 
 =item 5
 
-In case of no exceptions, it captures the output returned by the commands and displays them in a table.
+In case of no exception, it captures the output returned by the command and displays in a table.
 
 =back
 

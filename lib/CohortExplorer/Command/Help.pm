@@ -4,33 +4,34 @@ use base qw( CLI::Framework::Command::Meta );
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 #-------
 
 sub usage_text {
 
-	   q{
-              help [command]: application or command specific usage
-            };
+	q{
+           help [command]: application or command specific usage
+         };
 }
 
 sub run {
 
 	my ( $self, $opts, @args ) = @_;
 
-	my $app = $self->get_app();    # metacommand is app-aware
+	# Metacommand is app-aware
+	my $app = $self->get_app;
 
 	my $usage;
 	my $command_name = shift @args;
 
 	# Recognise help requests that refer to the target command by an alias
-	my %alias = $app->command_alias();
+	my %alias = $app->command_alias;
 
 	$command_name = $alias{$command_name}
 	  if ( $command_name && exists $alias{$command_name} );
 
-	my $h = $app->command_map_hashref();
+	my $h = $app->command_map_hashref;
 
 	# First, attempt to get command-specific usage
 	if ($command_name) {
@@ -38,25 +39,21 @@ sub run {
 		# (do not show command-specific usage message for non-interactive
 		# commands when in interactive mode)
 		$usage = $app->usage( $command_name, @args )
-		  unless ( $app->get_interactivity_mode()
+		  unless ( $app->get_interactivity_mode
 			&& !$app->is_interactive_command($command_name) );
 	}
 
-        # Commands search and compare can be invalid as they are application dependent (i.e. depend on
-        # availability of variables and datasource type) where as, menu and console commands are invalid only
-        # when the application is running in interactive mode
+	my $application_usage = $app->usage;
 
-	# The application usage should only contain information on valid commands
-	my $application_usage = $app->usage();
-
-	for ( $app->noninteractive_commands() ) {
+	# Remove usage of invalid/noninteractive commands from application help
+	for ( $app->noninteractive_commands ) {
 		$application_usage =~ s/\n\s+$_\s+\-[^\n]+//
 		  if (
 			(
-				$_ =~ /^search|compare|history$/
+				$_ =~ /^(search|compare|history)$/
 				&& !$app->is_interactive_command($_)
 			)
-			|| ( $_ =~ /^menu|console$/ && $app->get_interactivity_mode() )
+			|| ( $_ =~ /^(menu|console)$/ && $app->get_interactivity_mode )
 		  );
 
 	}

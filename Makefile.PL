@@ -31,6 +31,7 @@ WriteMakefile(
 		'Text::CSV_XS'               => 0.97,
 		'Text::ASCIITable'           => 0.20,
 		'Time::HiRes'                => 0,
+                'Tie::Autotie'               => 0,
 		'Tie::IxHash'                => 1.21,
 		'Term::ReadKey'              => 2.14,
 	},

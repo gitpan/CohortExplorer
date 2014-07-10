@@ -3,10 +3,9 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use base qw(CohortExplorer::Datasource);
-use Exception::Class::TryCatch;
 
 #-------
 
@@ -14,46 +13,74 @@ sub authenticate {
 
 	my ( $self, $opts ) = @_;
 
-	# Get the database handle and run authentication query
-	# The user must have permisison to export data (i.e. export_data_tool != 0)
+	my $legacy_hash;
 
-	my $stmt = "SELECT rp.project_id, rur.data_export_tool FROM redcap_auth AS ra INNER JOIN redcap_user_rights AS rur INNER JOIN redcap_projects AS rp ON rur.project_id=rp.project_id WHERE rp.project_name = ? AND rur.data_export_tool != 0 AND ra.username = ? AND ra.password = MD5(?) AND ( rp.project_id NOT IN ( SELECT project_id FROM redcap_external_links_exclude_projects ) AND ( rur.expiration <= CURDATE() OR rur.expiration IS NULL) )";
+	# Get the value of legacy_hash if it exists
+	if (
+		$self->dbh->selectrow_arrayref(
+			"SHOW COLUMNS FROM redcap_auth like 'legacy_hash'")
+	  )
+	{
+		($legacy_hash) = $self->dbh->selectrow_array(
+			"SELECT legacy_hash FROM redcap_auth WHERE username = ?",
+			undef, $opts->{username} );
+	}
 
-	my @bind = ( $self->name(), $opts->{username}, $opts->{password} );
+	my $stmt =
+      "SELECT rp.project_id, rur.data_export_tool, rur.group_id FROM redcap_auth AS ra INNER JOIN redcap_user_rights AS rur ON ra.username = rur.username INNER JOIN redcap_projects AS rp ON rur.project_id=rp.project_id WHERE rp.project_name = ? AND rur.data_export_tool != 0 AND ra.username = ? AND ra.password = "
+	  . (
+		defined $legacy_hash
+		? (
+			$legacy_hash == 0
+			? "SHA2(CONCAT(?, ra.password_salt), 512)"
+			: "MD5(CONCAT(?, ra.password_salt))"
+		  )
+		: '?'
+	  )
+	  . " AND ( rp.project_id NOT IN ( SELECT project_id FROM redcap_external_links_exclude_projects ) AND ( rur.expiration <= CURDATE() OR rur.expiration IS NULL))";
 
-	# Successful authentication outputs array_ref as response
-	my $response = $self->dbh()->selectrow_arrayref( $stmt, undef, @bind );
-
-	return $response;
+	return $self->dbh->selectrow_hashref( $stmt, undef, $self->name,
+		@{$opts}{qw/username password/} );
 }
 
-sub default_parameters {
+sub additional_params {
 
 	my ( $self, $opts, $response ) = @_;
 
-	my %default;
+        # Get static tables and dynamic_event_ids (i.e. comma separated event_ids of all repeating forms)
+	my $row = $self->dbh->selectall_arrayref(
+        "SELECT GROUP_CONCAT( DISTINCT IF (form_count = 1, form, NULL)) AS static_tables,  GROUP_CONCAT(DISTINCT IF (form_count > 1, dynamic_event_id, NULL)) AS dynamic_event_ids FROM ( SELECT GROUP_CONCAT( DISTINCT ref.form_name ) AS form, MIN(ref.event_id) AS dynamic_event_id, COUNT(ref.event_id) AS form_count, GROUP_CONCAT( DISTINCT rea.arm_id ORDER BY rea.arm_id ) AS arm FROM redcap_events_forms AS ref INNER JOIN redcap_events_metadata AS rem ON ref.event_id=rem.event_id INNER JOIN redcap_events_arms AS rea ON rea.arm_id = rem.arm_id WHERE rea.project_id = ? GROUP BY ref.form_name, rea.arm_id ORDER BY ref.event_id) AS x GROUP BY arm ORDER BY arm",
+		undef, $response->{project_id}
+	);
 
-	# Add project_id and data_export_tool to the default parameter
-	( $default{project_id}, $default{data_export_tool} ) = @$response;
+	die "Currently querying multiple arms is not supported\n" if ( @$row > 1 );
 
-	# Get static tables and init_event_id (dynamic tables) and visit_max
-	my $stmt = "SELECT GROUP_CONCAT( if ( count = 1, form_name, NULL ) ) AS static_tables, SUBSTRING_INDEX( GROUP_CONCAT( DISTINCT IF(count > 1, event_id, NULL ) ), ',', 1) AS init_event_id, MAX( count ) AS visit_max FROM (SELECT MIN( event_id ) AS event_id, form_name, COUNT( form_name ) AS count FROM redcap_events_forms WHERE event_id IN ( SELECT event_id FROM redcap_events_metadata WHERE arm_id IN ( SELECT arm_id FROM redcap_events_arms WHERE project_id = ? )) GROUP BY form_name ) AS `table`";
+	if (@$row) {
 
-	( $default{static_tables}, $default{init_event_id}, $default{visit_max} ) =
-	  $self->dbh()->selectrow_array( $stmt, undef, $default{project_id} );
+		# Split and sort dynamic event_ids
+		my @dynamic_event_id = sort split /,/, $row->[0][1];
+		$response->{type} = 'longitudinal';
 
-        # If the data was collated across multiple events the datasource is longitudinal
-        # otherwise standard (i.e. non-longitudinal)
-	if ( $default{init_event_id} && $default{visit_max} ) {
-		$default{type} = 'longitudinal';
-		$default{static_tables} = [ split /,\s*/, $default{static_tables} ];
+		# init_event_id is the event_id of the first repeating form
+		$response->{init_event_id} = $dynamic_event_id[0];
+		$response->{arms}          = @$row;
+		$response->{static_tables} = [ split /,/, $row->[0][0] ]
+		  if ( $row->[0][0] );
 	}
 
 	else {
-		$default{type} = 'standard';
+		$response->{type} = 'standard';
 	}
 
-	return \%default;
+        # Get a list of records/entities the user has access to
+	if ( $response->{group_id} ) {
+		 $response->{allowed_records} = $self->dbh->selectcol_arrayref(
+           "SELECT record FROM redcap_data WHERE project_id = ? AND field_name = '__GROUPID__' AND value = ?",
+			undef, @{$response}{qw/project_id group_id/}
+		);
+	}
+
+	return $response;
 }
 
 sub entity_structure {
@@ -61,54 +88,114 @@ sub entity_structure {
 	my ($self) = @_;
 
 	my %struct = (
-		-columns => {
-			entity_id => "rd.record",
-			variable  => "rd.field_name",
-			value     => "rd.value",
-			table     => "rf.form_name"
-		},
+		-columns => [
+			entity_id => 'rd.record',
+			variable  => 'rd.field_name',
+			value     => 'rd.value',
+			table     => 'form_name'
+		],
 		-from => [
 			-join => (
-				$self->type() eq 'standard'
-				? qw/redcap_data|rd <=>{project_id=project_id} redcap_metadata|rf/
-				: qw/redcap_data|rd <=>{event_id=event_id} redcap_events_forms|rf/
+				$self->type eq 'standard'
+				? qw/redcap_data|rd <=>{project_id=project_id} redcap_metadata|rm/
+				: qw/redcap_data|rd <=>{event_id=event_id} redcap_events_forms|ref/
 			  )
 
 		],
-		-where => { 'rd.project_id' => $self->project_id() }
+		-where => $self->allowed_records
+		? {
+			'rd.project_id' => $self->project_id,
+			'rd.record'     => { -in, $self->allowed_records },
+		  }
+		: { 'rd.project_id' => $self->project_id }
 	);
 
 	# Add visit column if the datasource is longitudinal
-	$struct{-columns}{visit} =
-	  'rd.event_id - ' . $self->init_event_id() . ' + 1'
-	  if ( $self->type() eq 'longitudinal' );
+	# Visit number is determined using the init_event_id
+	if ( $self->type eq 'longitudinal' ) {
+
+		if ( $self->static_tables ) {
+			push @{ $struct{-columns} },
+			  (
+				'visit',
+				'IF (form_name IN ('
+				  . join( ',', map { "'$_'" } @{ $self->static_tables } )
+				  . '), NULL, rd.event_id - '
+				  . $self->init_event_id
+				  . ' + 1 )'
+			  )
+
+		}
+		else {
+			push @{ $struct{-columns} },
+			  ( 'visit', 'rd.event_id - ' . $self->init_event_id . ' + 1 ' );
+		}
+
+	}
 
 	return \%struct;
-
 }
 
 sub table_structure {
 
 	my ($self) = @_;
 
-	return {
-		-columns => {
-			table => "GROUP_CONCAT( DISTINCT form_name )",
-			label => "GROUP_CONCAT( DISTINCT IF( form_menu_description IS NOT NULL, form_menu_description, '' ) SEPARATOR '')",
-			variable_count => "COUNT( field_name )"
-		},
-		-from  => 'redcap_metadata',
-		-where => $self->data_export_tool() == 1
-		? { 'project_id' => $self->project_id() }
-		: {
-			'project_id' => $self->project_id(),
-			'field_phi'  => { '=', undef },
-		},
-		-order_by => 'field_order',
-		-group_by => 'form_name',
-		-having   => { 'variable_count' => { '>', 0 } }
-	};
+	my @column = (
+		arm            => "GROUP_CONCAT( DISTINCT rea.arm_name)",
+		table          => 'GROUP_CONCAT( DISTINCT rm.form_name)',
+		label          => 'GROUP_CONCAT( DISTINCT rm.form_menu_description)',
+		variable_count => 'COUNT(rm.field_name)',
+		event_count    => 'COUNT(DISTINCT rem.day_offset)',
+		event_description =>
+        "GROUP_CONCAT(DISTINCT CONCAT( rem.descrip, '(', rem.day_offset,')' ) ORDER BY rem.day_offset SEPARATOR '\n ')"
+	);
 
+	if ( $self->type eq 'longitudinal' ) {
+
+		return {
+
+			-columns => \@column,
+			-from    => [
+				-join =>
+				  qw/redcap_metadata|rm <=>{form_name=form_name} redcap_events_forms|ref <=>{event_id=event_id} redcap_events_metadata|rem <=>{arm_id=arm_id} redcap_events_arms|rea/
+			],
+			-order_by => $self->arms
+			? [qw/rea.arm_id rm.form_name rem.day_offset/]
+			: 'rm.form_name',
+			-group_by => $self->arms ? [qw/rea.arm_id rm.form_name/]
+			: 'rem.day_offset',
+			-having => { 'variable_count' => { '>', 0 } },
+			-where  => $self->data_export_tool == 1
+			? {
+				'rm.project_id'  => $self->project_id,
+				'rea.project_id' => { -ident => 'rm.project_id' }
+			  }
+			: {
+				'rm.project_id'  => $self->project_id,
+				'rm.field_phi'   => { '=', undef },
+				'rea.project_id' => { -ident => 'rm.project_id' }
+			},
+		};
+	}
+
+	else {
+
+		return {
+
+			-columns  => [ splice( @column, 2, 6 ) ],
+			-from     => 'redcap_metadata AS rm',
+			-order_by => 'rm.field_order',
+			-group_by => 'rm.form_name',
+			-having => { 'variable_count' => { '>', 0 } },
+			-where  => $self->data_export_tool == 1
+			? { 'rm.project_id' => $self->project_id }
+			: {
+				'rm.project_id' => $self->project_id,
+				'rm.field_phi'  => { '=', undef },
+			}
+		  }
+
+	}
 }
 
 sub variable_structure {
@@ -117,22 +204,24 @@ sub variable_structure {
 
 	# If data_export_tool is != 1 remove variables tagged as identifiers
 	return {
-		-columns => {
-			variable => "field_name",
-			table    => "form_name",
-			type => "IF( element_validation_type IS NULL, 'text', element_validation_type)",
-			unit => "field_units",
-			category => "IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')",
-			label => "element_label"
-		},
-		-from  => 'redcap_metadata',
-		-where => $self->data_export_tool() == 1
-		? { 'project_id' => $self->project_id() }
+		-columns => [
+			variable => 'field_name',
+			table    => 'form_name',
+			type =>
+            "IF( element_validation_type IS NULL, 'text', element_validation_type)",
+			unit => 'field_units',
+			category =>
+            "IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')",
+			label => 'element_label'
+		],
+		-from     => 'redcap_metadata',
+		-order_by => 'field_order',
+		-where    => $self->data_export_tool == 1
+		? { 'project_id' => $self->project_id }
 		: {
-			'project_id' => $self->project_id(),
+			'project_id' => $self->project_id,
 			'field_phi'  => { '=', undef },
 		},
-		-order_by => 'field_order'
 	};
 
 }
@@ -140,7 +229,6 @@ sub variable_structure {
 sub datatype_map {
 
 	return {
-
 		'int'                  => 'signed',
 		'float'                => 'decimal',
 		'date_dmy'             => 'date',
@@ -153,13 +241,12 @@ sub datatype_map {
 		'datetime_seconds_mdy' => 'datetime',
 		'datetime_seconds_ymd' => 'datetime',
 		'number'               => 'decimal',
-		'number_1dp'           => 'decimal',
-		'number_2dp'           => 'decimal',
-		'number_3dp'           => 'decimal',
-		'number_4dp'           => 'decimal',
+		'number_1dp'           => 'decimal(10,1)',
+		'number_2dp'           => 'decimal(10,2)',
+		'number_3dp'           => 'decimal(10,3)',
+		'number_4dp'           => 'decimal(10,4)',
 		'time'                 => 'time',
 		'time_mm_sec'          => 'time'
-
 	};
 }
 
@@ -172,7 +259,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Application::REDCap::Datasource - CohortExplorer class to initialise datasource stored under L<REDCap|http://project-redcap.org/> framework
+CohortExplorer::Application::REDCap::Datasource - CohortExplorer class to initialize datasource stored under L<REDCap|http://project-redcap.org/> framework
 
 =head1 SYNOPSIS
 
@@ -180,23 +267,23 @@ The class is inherited from L<CohortExplorer::Datasource> and overrides the foll
 
 =head2 authenticate( $opts )
 
-This method authenticates the user by running the authentication query against the REDCap database. The successful authentication returns array ref containing C<project_id> and C<data_export_tool>. In order to use CohortExplorer the user must have the permission to export data in REDCap (i.e. C<data_export_tool != 0>).
+This method authenticates the user by running the authentication query against the REDCap database. The successful authentication returns hash ref containing C<project_id>, C<data_export_tool> and C<group_id>. In order to use CohortExplorer with REDCap the user must have the permission to export data in REDCap (i.e. C<data_export_tool != 0>). At present the application only supports the standard REDCap table authentication.
 
-=head2 default_parameters( $opts, $response )
+=head2 additional_params( $opts, $response )
 
-This method adds C<project_id> and C<data_export_tool> to the datasource object as default parameters. Moreover, the method runs a SQL query to check if the datasource is standard or longitudinal. If the datasource is longitudinal then, C<static_tables>, C<visit_max> and C<init_event_id> are added as default parameters. At present the application does not support datasources with multiple arms.
+This method adds the authentication response to the datasource object. The method also runs a SQL query to determine the datasource type (i.e. standard/cross-sectional or longitudinal). For longitudinal datasources the method attempts to set C<static_tables> and C<init_event_id> (i.e. event_id of the first repeating form). At present the application does not support datasources with multiple arms.
 
 =head2 entity_structure()
 
-This method returns the hash ref defining the entity structure.
+This method returns a hash ref defining the entity structure. The method uses the C<init_event_id> parameter set in C<additional_params> to define C<visit> column for the longitudinal datasources. The hash ref contains the condition for the inclusion/exclusion of records.
 
 =head2 table_structure() 
 
-This method returns the hash ref defining the table structure. The hash ref includes table attributes, C<variable_count> and C<label>.
+This method returns a hash ref defining the table structure. The C<-columns> key within the table structure depends on the datasource type. For standard datasources the C<-columns> key includes C<table>, C<label> and C<variable_count> where as for longitudinal datasources it comprises of C<table>, C<arm>, C<variable_count>, C<label>, C<event_count> and C<event_description>.
 
 =head2 variable_structure()
 
-This method returns the hash ref defining the variable structure. The hash ref includes the condition appertaining to the inclusion/exclusion of the variables tagged as identifiers. The variable attributes include C<unit>, C<type>, C<category> and C<label>.
+This method returns a hash ref defining the variable structure. The hash ref uses the C<data_export_tool> parameter set in C<additional_params> to specify condition for the inclusion/exclusion of variables tagged as identifiers. The variable attributes include columns such as C<table>, C<unit>, C<type>, C<category> and C<label>.
 
 =head2 datatype_map()
 

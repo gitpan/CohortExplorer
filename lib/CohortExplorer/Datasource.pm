@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.10;
+our $VERSION = 0.11;
 
 use Carp;
 use Config::General;
@@ -11,24 +11,25 @@ use CLI::Framework::Exceptions qw ( :all);
 use DBI;
 use Exception::Class::TryCatch;
 use SQL::Abstract::More;
+use Tie::Autotie 'Tie::IxHash';
 
 #-------
 
-sub initialise {
+sub initialize {
 
 	my ( $class, $opts, $config_file ) = @_;
 
-	my $param;
+	my $config;
 
-	# Get the configuration for the specified datasource from the config file
+	# Get supplied datasource's configuration from the config file
 	eval {
-		$param = {
+		$config = {
 			Config::General->new(
 				-ConfigFile            => $config_file,
 				-LowerCaseNames        => 1,
 				-MergeDuplicateBlocks  => 1,
 				-MergeDuplicateOptions => 1
-			  )->getall()
+			  )->getall
 		}->{datasource}{ $opts->{datasource} };
 	};
 
@@ -36,44 +37,46 @@ sub initialise {
 		throw_app_init_exception( error => $e );
 	}
 
-	throw_app_init_exception(
-		error => "Invalid datasource '$opts->{datasource}'" )
-	  unless ($param);
+	if ( !$config ) {
+		throw_app_init_exception(
+			error => "Invalid datasource '$opts->{datasource}'" );
+	}
 
-	throw_app_init_exception( error =>
-		  "Mandatory parameter 'namespace' is missing from '$opts->{datasource}'" )
-	  unless ( $param->{namespace} );
+	if ( !$config->{namespace} ) {
+		throw_app_init_exception( error =>
+                 "Mandatory parameter 'namespace' is missing from '$opts->{datasource}'"
+		);
+	}
 
-	eval "require $1"
-	  if ( $param->{namespace} =~ /^(.+)$/g );    # May or may not be preloaded
+	# Untaint and load the datasource package
+	if ( $config->{namespace} =~ /^(.+)$/g ) {
+		  eval "require $1";
+	}
 
-	$param->{name} ||= $opts->{datasource};
-	$param->{alias} = $opts->{datasource};
-	$param->{dialect} ||= 'MySQL_old';
+	# Add name and alias to config
+	$config->{name} ||= $opts->{datasource};
+	$config->{alias} = $opts->{datasource};
 
+	# Connect to the database
 	eval {
-		$param->{dbh} =
-		  DBI->connect( $param->{dsn}, $param->{username}, $param->{password},
-			{ PrintError => 0, RaiseError => 1 } );
+		$config->{dbh} = DBI->connect(
+			@{$config}{qw/dsn username password/},
+			{ PrintError => 0, RaiseError => 1 }
+		);
 	};
 
 	if ( catch my $e ) {
 		throw_app_init_exception( error => $e );
 	}
 
-	for (qw(dsn username password)) {
-                # Remove DSN, username and password
-		delete $param->{$_};
-	}
-
 	# Add sqla object
-	$param->{sqla} = SQL::Abstract::More->new(
-		sql_dialect    => $param->{dialect},
+	$config->{sqla} = SQL::Abstract::More->new(
+		sql_dialect => $config->{dialect} ||= 'MySQL_old',
 		max_members_IN => 100
 	);
 
 	# Instantiate datasource
-	my $obj = $1->new($param)
+	my $obj = $1->new($config)
 	  or croak "Failed to instantiate datasource package '$1' via new(): $!";
 
 	$obj->_process($opts);
@@ -82,114 +85,171 @@ sub initialise {
 
 sub _process {
 
-	my ( $datasource, $opts ) = @_;
+	my ( $ds, $opts ) = @_;
 
-	print STDERR "Authenticating $opts->{username}\@$opts->{datasource} ...\n"
-	  if ( $opts->{verbose} );
+	my $class = ref $ds;
 
-	my $response = $datasource->authenticate($opts);
+	if ( $opts->{verbose} ) {
+		print STDERR
+		"Authenticating $opts->{username}\@$opts->{datasource} ...\n";
+	}
+
+	my $response = $ds->authenticate($opts);
 
 	# Successful authentication returns a defined response
-	throw_app_init_exception( error =>
-		  "Failed to authenticate $opts->{username}\@$opts->{datasource}" )
-	  unless ($response);
-
-	print STDERR
-      "Initializing application for $opts->{username}\@$opts->{datasource} ...\n"
-	  if ( $opts->{verbose} );
-
-	my $class = ref $datasource;
-
-	my $default_param = $datasource->default_parameters( $opts, $response );
-
-	throw_app_hook_exception( error =>
-      "return from method 'default_parameters' in class '$class' is not hash worthy"
-	) unless ( ref $default_param eq 'HASH' );
-
-	for ( keys %$default_param ) {
-		$datasource->{$_} = $default_param->{$_};
+	if ( !$response ) {
+		throw_app_init_exception( error =>
+                 "Either the username/password combination is incorrect or you do not seem to have the correct permission to query the datasource"
+		);
 	}
 
-	my $datasource_type = $datasource->type();
+	if ( $opts->{verbose} ) {
+		print STDERR
+                 "Initializing application for $opts->{username}\@$opts->{datasource} ...\n";
+	}
 
-	throw_app_hook_exception( error =>
-		  "Datasource type (i.e. standard/longitudinal) is not found" )
-	  if (!$datasource_type
-		|| $datasource_type !~ /^(standard|longitudinal)$/ );
+        # Response is passed to additional_params as it may contain
+        # some data which the subclass hook can use to fetch other paramaters
+	my $additional_params = $ds->additional_params( $opts, $response );
 
-	require Tie::IxHash;
+	if ( ref $additional_params ne 'HASH' ) {
+		throw_app_hook_exception( error =>
+                 "Return from method 'additional_params' in class '$class' is not hash worthy"
+		);
+	}
 
+	# Add return from additional_params to datasource
+	@$ds{ keys %$additional_params } =
+	  @$additional_params{ keys %$additional_params };
+
+	if ( !$ds->type || $ds->type !~ /^(standard|longitudinal)$/ ) {
+		throw_app_hook_exception( error =>
+                   "Datasource type (i.e. standard/longitudinal) is not speciifed for datasource '$opts->{datasource}'"
+		);
+	}
+
+	# Check all subclass hooks for mandatory SQL parameters
 	for my $p (qw/entity table variable/) {
 		my $method = $p . '_structure';
-		my $struct = $datasource->$method();
+		my $struct = $ds->$method;
 
-		# check all mandatory sql parameters are defined
 		for (qw/-columns -from -where/) {
-			throw_app_hook_exception(
-				error => "'$_' missing in method '$method' of class '$class'" )
-			  unless $struct->{$_};
+			if ( !$struct->{$_} ) {
+				throw_app_hook_exception( error =>
+					  "'$_' missing in method '$method' in class '$class'" );
+			}
 		}
 
-		throw_app_hook_exception( error =>
-         "'-columns' in method '$method' of class '$class' is not hash worthy"
-		) unless ref $struct->{-columns} eq 'HASH';
+		# -columns field is expected to be hash worthy
+		if ( scalar @{ $struct->{-columns} } % 2 != 0 ) {
+			throw_app_hook_exception( error =>
+                         "'-columns' in method '$method' in class '$class' is not hash worthy"
+			);
+		}
 
-		# Set entity params (i.e. entity_count, visit_max), tables and variables
-		$method = 'set_' . $p . '_parameters';
-		$datasource->$method($struct);
+		# Transform -columns to hashref
+		my $map = $ds->_list_to_hashref( $method, @{ $struct->{-columns} } );
+
+		# Set parameters specific to subclass hook's name
+		$method = 'set_' . $p . '_params';
+
+		$ds->$method( $struct, $map );
 	}
 
-	$datasource->set_visit_variables()
-	  if ( $datasource_type eq 'longitudinal' );
+	if ( $ds->type eq 'longitudinal' ) {
+
+	        # Visit variables are only set if the datasource is longitudinal and contains
+	        # data on at least 2 visits; visit variables are used in compare command
+		if ( $ds->visit_max && $ds->visit_max > 1 ) {
+			 $ds->set_visit_variables;
+		}
+
+                # If visit max is either undefined or <= 1 set datasource type to standard
+                # At the start of some study there may not be any data in any dynamic table or
+                # the data may only be for the first visit
+		if ( ( $ds->visit_max && $ds->visit_max < 2 ) || !$ds->visit_max ) {
+			   $ds->{type} = 'standard';
+
+			if ( $opts->{verbose} ) {
+				print STDERR
+                                   "Datasource is set to standard because visit max is either undefined or less than 2 ...\n";
+			}
+		}
+	}
 
 }
 
-sub set_entity_parameters {
+# Convert a list to a HASH ref if list is hash-worthy
+sub _list_to_hashref {
 
-	my ( $datasource, $struct ) = @_;
-	my $class = ref $datasource;
+	my ( $ds, $method, @map ) = @_;
 
-	# Make sure -columns hash in entity_structure has all mandatory keys
-	for (
-		$datasource->type() eq 'standard'
+	my $class = ref $ds;
+
+	# Preserve column order
+	tie my %h, 'Tie::IxHash';
+
+	for my $i ( 0 .. $#map - 1 ) {
+		if ( $i % 2 == 0 ) {
+			my ( $k, $v ) = ( lc $map[$i], $map[ $i + 1 ] );
+
+			# Throw exception if list contains duplicate column names
+			if ( exists $h{$k} ) {
+				throw_app_hook_exception( error =>
+                "List returned by '$method' in class '$class' is not hash-worthy (duplicate keys for $i)"
+				);
+			}
+			$h{$k} = $v;
+		}
+	}
+
+	return \%h;
+}
+
+sub set_entity_params {
+
+	my ( $self, $struct, $map ) = @_;
+	my $class = ref $self;
+
+	# Check all mandatory columns are present
+	for my $c (
+		$self->type eq 'standard'
 		? qw/entity_id table variable value/
 		: qw/entity_id table variable value visit/
 	  )
 	{
-		if ( $struct->{-columns}{$_} ) {
-			if ( $_ eq 'entity_id' ) {
-				$struct->{-columns}{$_} =
-				  " COUNT( DISTINCT $struct->{-columns}{$_} ) ";
-			}
-			if ( $_ eq 'visit' ) {
-				$struct->{-columns}{$_} = $datasource->visit_max()
-				  || " MAX( DISTINCT $struct->{-columns}{$_} + 0 ) ";
-			}
-		}
-		else {
+		if ( !$map->{$c} ) {
 			throw_app_hook_exception( error =>
-             "Missing column '$_' in method 'entity_structure' of class '$class' "
+            "Column '$c' in method 'entity_structure' in class '$class' is not defined"
 			);
 		}
 	}
 
-	# Retrieve entity_count and visit_max (if applicable)
+	# Add column name-SQL pair to datasource for use
+	# within search/compare commands
+	$self->{entity_columns} = $map;
+
+	##----- SQL TO FETCH ENTITY_COUNT & VISIT MAX -----##
+
+	# If visit max is not defined by the sub-class,
+	# create visit_max using 'visit' column
+	$struct->{-columns} = [
+		" COUNT( DISTINCT $map->{entity_id} ) ",
+		$self->visit_max
+		  || ( $map->{visit} ? " MAX( DISTINCT $map->{visit} + 0 ) " : 'NULL' )
+	];
+
 	my ( $stmt, @bind );
 
-	$struct->{-columns} =
-	  [ $struct->{-columns}{entity_id}, $struct->{-columns}{visit} || 'NULL' ];
-
-	$struct->{-where}{'ve.identifier'} =
-
-	  eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
+	eval { ( $stmt, @bind ) = $self->sqla->select(%$struct); };
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
 	}
 
 	eval {
-		( $datasource->{entity_count}, $datasource->{visit_max} ) =
-		  $datasource->dbh()->selectrow_array( $stmt, undef, @bind );
+		@{$self}{qw/entity_count visit_max/} =
+		  $self->dbh->selectrow_array( $stmt, undef, @bind );
 	};
 
 	if ( catch my $e ) {
@@ -197,141 +257,142 @@ sub set_entity_parameters {
 	}
 
 	# Validate entity_count
-	if ( $datasource->{entity_count} == 0 ) {
-		throw_app_hook_exception(
-			error => 'No entities are found in datasource '
-			  . $datasource->name() );
+	if ( $self->{entity_count} == 0 ) {
+		throw_app_init_exception(
+			    error => "No entities are found in datasource '"
+			  . $self->name
+			  . "'" );
 	}
+}
 
-	# Validate visit_max, only applicable to longitudinal datasources
-	if (
-		$datasource->type() eq 'longitudinal'
-		&& (  !$datasource->{visit_max}
-			|| $datasource->{visit_max} <= 1
-			|| $datasource->{visit_max} > 99 )
-	  )
-	{
+sub set_table_params {
+
+	my ( $self, $struct, $map ) = @_;
+	my $class   = ref $self;
+	my $ds_name = $self->name;
+
+	# Throw exception if column 'table' is not defined
+	if ( !$map->{table} ) {
 		throw_app_hook_exception( error =>
-			  "Expecting Visit (max) between 2-99 for a longitudinal datasource"
+        "Column 'table' in method 'table_structure' in class '$class' is not defined"
 		);
 	}
 
-}
+	##----- SQL TO FETCH TABLE DATA -----##
 
-sub set_table_parameters {
+	my ( $stmt, @bind, $table );
 
-	my ( $datasource, $struct ) = @_;
-	my $class           = ref $datasource;
-	my $datasource_name = $datasource->name();
+	# Format column name-SQL pairs along the lines of columns in
+	# SQL::Abstract::More (add names as aliases really)
+	$struct->{-columns} = [ map { "$map->{$_}|`$_`" } keys %$map ];
 
-	throw_app_hook_exception( error =>
-     "Missing column 'table' in method 'table_structure' of class '$class' "
-	) unless ( $struct->{-columns}{table} );
-
-	my ( $stmt, @bind, $sth );
-	$struct->{-columns} = [
-		map { $struct->{-columns}{$_} . "|`$_`" }
-		  keys %{ $struct->{-columns} }
-	];
-
-	# Retrieve data on tables
-	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
+	eval { ( $stmt, @bind ) = $self->sqla->select(%$struct); };
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
 	}
 
 	eval {
-		$sth = $datasource->dbh()->prepare_cached($stmt);
-		$sth->execute(@bind);
+		$table =
+		  $self->dbh->selectall_arrayref( $stmt, { Slice => {} }, @bind );
 	};
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
 	}
 
-	my @rows = @{ $sth->fetchall_arrayref( {} ) };
-	$sth->finish();
+	if ( @$table == 0 ) {
+		throw_app_init_exception( error =>
+			  "No accessible tables are found in datasource '$ds_name'" );
+	}
 
-	throw_app_hook_exception(
-		error => "No accessible 'tables' are found in datasource '$datasource_name'" )
-	  unless (@rows);
+	# Preserve order of tables
+	tie %{ $self->{tables} }, 'Tie::IxHash';
 
-	tie %{ $datasource->{tables} }, "Tie::IxHash";    # Preserve order of tables
-
-	for my $row (@rows) {
-		throw_app_hook_exception( error =>
-			  "Undefined table '$row->{table}' found in datasource '$datasource_name'" )
-		  unless ( $row->{table} );
-		$datasource->{tables}{ $row->{table} } = $row;
+	for my $t (@$table) {
+		for my $c ( keys %$map ) {
+			$self->{tables}{ $t->{table} }{$c} = $t->{$c};
+		}
 	}
 }
 
-sub set_variable_parameters {
+sub set_variable_params {
 
-	my ( $datasource, $struct ) = @_;
-	my $class           = ref $datasource;
-	my $datasource_name = $datasource->name();
+	my ( $self, $struct, $map ) = @_;
+	my $class   = ref $self;
+	my $ds_name = $self->name;
 
-	# Check -columns hash has mandatory keys 'table' and 'variable'
-	throw_app_hook_exception( error =>
-    "Column variable/table missing from method 'variable_structure' in class '$class'"
-	) if ( !$struct->{-columns}{variable} || !$struct->{-columns}{table} );
+	# Throw exception if column 'table' or 'variable' is not defined
+	if ( !$map->{table} || !$map->{variable} ) {
+		 throw_app_hook_exception( error =>
+         "No mapping found for column 'table' or 'variable' in method 'variable_structure' in class '$class'"
+		);
+	}
 
-	my ( $stmt, @bind, $sth );
+	# Add column name-SQL pair to datasource for use
+	# within find command
+	$self->{variable_columns} = $map;
 
-	$struct->{-columns} = [
-		map { $struct->{-columns}{$_} . "|`$_`" }
-		  keys %{ $struct->{-columns} }
-	];
+	##----- SQL TO FETCH TABLE DATA -----##
 
-	eval { ( $stmt, @bind ) = $datasource->sqla()->select(%$struct); };
+	my ( $stmt, @bind, $variable );
+
+	# Format column name-SQL pairs along the lines of columns in
+	# SQL::Abstract::More
+	$struct->{-columns} = [ map { "$map->{$_}|`$_`" } keys %$map ];
+
+	eval { ( $stmt, @bind ) = $self->sqla->select(%$struct); };
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
 	}
 
 	eval {
-		$sth = $datasource->dbh()->prepare_cached($stmt);
-		$sth->execute(@bind);
+		$variable =
+		  $self->dbh->selectall_arrayref( $stmt, { Slice => {} }, @bind );
 	};
 
 	if ( catch my $e ) {
 		throw_app_hook_exception( error => $e );
 	}
 
-	my @rows = @{ $sth->fetchall_arrayref( {} ) };
-	$sth->finish();
-
-	throw_app_hook_exception( error =>
-		  "No accessible 'variables' are found in datasource '$datasource_name'" )
-	  unless (@rows);
+	if ( @$variable == 0 ) {
+		throw_app_init_exception( error =>
+			  "No accessible variables are found in datasource '$ds_name'" );
+	}
 
 	# Get the variable data type to sql data type mapping
-	my $datatype_map = $datasource->datatype_map();
+	my $datatype_map = $self->datatype_map;
 
-	throw_app_hook_exception( error =>
-		  "return from method 'datatype_map' in class '$class' is not hash worthy"
-	) unless ( ref $datatype_map eq 'HASH' );
+	if ( ref $datatype_map ne 'HASH' ) {
+		throw_app_init_exception( error =>
+                 "Return from method 'datatype_map' in class '$class' is not hash worthy"
+		);
+	}
 
-	tie %{ $datasource->{variables} },
-	  "Tie::IxHash";    # Preserve order of variables
+	# Preserve order of variables
+	tie %{ $self->{variables} }, 'Tie::IxHash';
 
-	for my $row (@rows) {
-		throw_app_hook_exception( error =>
-			  "Undefined table/variable found in datasource '$datasource_name'" )
-		  if ( !$row->{table} || !$row->{variable} );
+	for my $v (@$variable) {
 
-                # Variables are referenced as 'Table.Variable'
-                # $datasource->{variables} contains only two attributes (i.e. category and type) as
-                # only these are used in search/compare commands.
-                # Find command involves use of all variable attributes.
-		$datasource->{variables}{ $row->{table} . '.' . $row->{variable} } = {
-			'category' => $row->{category} || undef,
+		if ( !$v->{table} || !$v->{variable} ) {
+			throw_app_init_exception( error =>
+				  "Undefined table/variable found in datasource '$ds_name'" );
+		}
 
-			# Convert variable_types to SQL types (default varchar(255))
-			'type' => $datatype_map->{ $row->{type} } || 'CHAR(255)'
-		};
+		# Add table-variable combination as key because
+		# variables across tables may have same names
+		my $k = $v->{table} . '.' . $v->{variable};
+
+		for my $c ( keys %$map ) {
+                        # Add all variable attributes
+			$self->{variables}{$k}{$c} = $v->{$c};
+		}
+
+		# Set 'category' and 'type' attributes if not set
+		$self->{variables}{$k}{category} = $v->{'category'} || undef,
+		  $self->{variables}{$k}{type} =
+		  $datatype_map->{ $v->{type} } || 'CHAR(1000)';
 	}
 }
 
@@ -342,17 +403,18 @@ sub new {
 
 sub set_visit_variables {
 
-	my ($datasource) = @_;
+	my ($self) = @_;
 
-	my @static_tables = @{ $datasource->static_tables() || [] };
-	my $visit_max = $datasource->visit_max();
+	my @static_table = @{ $self->static_tables || [] };
+	my $vars         = $self->variables;
+	my $visit_max    = $self->visit_max;
 
-	for my $var ( keys %{ $datasource->variables() } ) {
-		$var =~ /^([^\.]+)\..+$/;
-
-		unless ( grep( /^$1/, @static_tables ) ) {
-			for ( qw(any last), 1 .. $visit_max ) {
-				push @{ $datasource->{visit_variables} }, "V$_.$var";
+	# Add suffix (vAny, vLast, v1, v2 etc.) to variables
+	# belonging to dynamic tables
+	for my $v ( keys %$vars ) {
+		if ( !grep( $_ eq $vars->{$v}{table}, @static_table ) ) {
+			for my $i ( qw(Any Last), 1 .. $self->visit_max ) {
+				push @{ $self->{visit_variables} }, "v$i.$v";
 			}
 		}
 	}
@@ -360,28 +422,28 @@ sub set_visit_variables {
 
 sub DESTROY {
 
-	my ($datasource) = @_;
+	my ($ds) = @_;
 
-	$datasource->dbh()->disconnect() if ( $datasource->dbh() );
+	$ds->dbh->disconnect if ( $ds->dbh );
 
 }
 
 sub AUTOLOAD {
 
-	my ($datasource) = @_;
+	my ($ds) = @_;
 
 	our $AUTOLOAD;
 
 	( my $param = lc $AUTOLOAD ) =~ s/.*:://;
 
-	return $datasource->{$param} || undef;
+	return $ds->{$param} || undef;
 }
 
 #--------- SUBCLASSES HOOKS --------#
 
 sub authenticate { 1 }
 
-sub default_parameters { {} }
+sub additional_params { {} }
 
 sub entity_structure { }
 
@@ -406,7 +468,7 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
 
     # The code below shows methods your datasource class overrides
 
-    package CohortExplorer::Application::REDCap::Datasource;
+    package CohortExplorer::Application::My::Datasource;
     use base qw( CohortExplorer::Datasource );
 
     sub authenticate { 
@@ -415,18 +477,21 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
                 
         # authentication code...
 
+          # Successful response may return a scalar (e.g. project_id) depending on the requirement
           return $response
         
     }
 
-    sub default_parameters {
+    sub additional_params {
         
          my ($self, $opts, $response) = @_;
           
-         # get database handle (i.e. $self->dbh()) and run some SQL queries to get additional parameters
-         # or, simply add some parameters without querying the database
-         
-         return $default;
+         my %params;
+
+         # get database handle (i.e. $self->dbh) and run some SQL queries to get additional parameters
+         # (e.g. project_id ) to be used in entity/variable/table structure hooks
+          
+         return \%params;
     }
     
     sub entity_structure {
@@ -435,20 +500,18 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
          
          my %struct = (
                       -columns =>  {
-                                     entity_id => "rd.record",
-                                     variable => "rd.field_name",
-                                     value => "rd.value",
-                                     table => "rm.form_name"
+                                     entity_id => 'd.record',
+                                     variable => 'd.field_name',
+                                     value => 'd.value',
+                                     table => 'm.form_name'
                        },
-                       -from =>  [ -join => qw/redcap_data|rd <=>{project_id=project_id} redcap_metadata|rm/ ],
+                       -from =>  [ -join => qw/data|d <=>{project_id=project_id} metadata|m/ ],
                        -where =>  { 
-                                     "rd.project_id" => $self->project_id()
+                       	              # project_id accessor to impose condition
+                                     'd.project_id' => $self->project_id
                         }
           );
-
-          $struct{-columns}{visit} =  'rd.event_id-' . $self->init_event_id()  
-          if ( $self->type() eq 'longitudinal');
-         
+          
           return \%struct;
      }
      
@@ -460,16 +523,16 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
          return {
                  
                   -columns => {
-                                 table => "GROUP_CONCAT( DISTINCT form_name )", 
-                                 variable_count => "COUNT( field_name )",
-                                 label => "element_label"
+                                 table => 'GROUP_CONCAT( DISTINCT form_name )', 
+                                 variable_count => 'COUNT( field_name )',
+                                 label => 'element_label'
                   },
-                 -from  => "redcap_metadata",
+                 -from  => 'metadata'',
                  -where => {
-                             "project_id" => $self->project_id()
+                             project_id => $self->project_id
                   },
-                 -order_by => "field_order",
-                 -group_by => "form_name"
+                 -order_by => 'field_order',
+                 -group_by => 'form_name'
         };
      }
      
@@ -479,89 +542,94 @@ CohortExplorer::Datasource - CohortExplorer datasource superclass
          
          return {
                  -columns => {
-                               variable => "field_name",
-                               table => "form_name",
-                               label => "element_label",
+                               variable => 'field_name',
+                               table => 'form_name',
+                               label => 'element_label',
                                type => "IF( element_validation_type IS NULL, 'text', element_validation_type)",
                                category => "IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')"
                  },
-                -from => "redcap_metadata",
+                -from => 'metadata',
                 -where => { 
-                             "project_id" => $self->project_id()
+                             project_id => $self->project_id
                  },
-                -order_by => "field_order"
+                -order_by => 'field_order'
         };
      }
      
      sub datatype_map {
         
       return {
-                  'int'         => 'signed',
-                 'float'        => 'decimal',
-                 'date_dmy'     => 'date',
-                 'date_mdy'     => 'date',
-                 'date_ymd'     => 'date',
-                 'datetime_dmy' => 'datetime'
+                  int         => 'signed',
+                 float        => 'decimal',
+                 date_dmy     => 'date',
+                 date_mdy     => 'date',
+                 date_ymd     => 'date',
+                 datetime_dmy => 'datetime'
       };
     }
     
+=head1 DESCRIPTION
+
+CohortExplorer::Datasource is the base class for all datasources. When connecting CohortExplorer to EAV repositories other than L<Opal (OBiBa)|http://obiba.org/node/63/> and L<REDCap|http://project-redcap.org/> the user is expected to create a class which inherits from CohortExplorer::Datasource. The datasources/projects implemented using Opal and REDCap can be queried using the inbuilt L<Opal (OBiBa)CohortExplorer::Application::Opal::Datasource> and L<REDCap|CohortExplorer::Application::REDCap::Datasource> APIs (see L<here|http://www.youtube.com/watch?v=Tba9An9cWDY>).
+
+
 =head1 OBJECT CONSTRUCTION
 
-=head2 initialise( $opts, $config_file )
+=head2 initialize( $opts, $config_file )
 
-CohortExplorer::Datasource is an abstract factory; C<initialise()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C<datasource-config.properties>) to instantiate the datasource object. The config file takes the format below,
+CohortExplorer::Datasource is an abstract factory; C<initialize()> is the factory method that constructs and returns an object of the datasource supplied as an application option. This class reads the datasource configuration from the config file (i.e. C<datasource-config.properties>) to instantiate the datasource object. A sample config file is shown below:
 
-        <datasource Clinical> 
-         namespace=CohortExplorer::Application::Opal::Version::1::Datasource
-         type=longitudinal
-         static_tables=Demographics,FamilyHistory
-         url=myhost
-         dsn=DBI:mysql:database=opal;host=myhost;port=3306
-         username=yourusername
-         password=yourpassword
+        <datasource datasourceA> 
+         namespace=CohortExplorer::Application::Opal::Datasource
+         url=http://example.com
+         entity_type=Participant
+         dsn=DBI:mysql:database=opal;host=hostname;port=3306
+         username=database_username
+         password=database_password
        </datasource> 
 
-       <datasource Clinical1> 
-         namespace=CohortExplorer::Application::Opal::Version::1::Datasource
-         type=longitudinal
-         id_visit_separator=_
-         name=Clinical
-         url=myhost
-         dsn=DBI:mysql:database=opal;host=myhost;port=3306
-         username=yourusername
-         password=yourpassword
+       <datasource datasourceB> 
+         namespace=CohortExplorer::Application::Opal::Datasource
+         url=http://example.com
+         entity_type=Instrument
+         dsn=DBI:mysql:database=opal;host=hostname;port=3306
+         username=database_username
+         password=database_password
+         name=datasourceA
        </datasource> 
 
-       <datasource Drugs> 
+       <datasource datasourceC> 
          namespace=CohortExplorer::Application::REDCap::Datasource
          dsn=DBI:mysql:database=opal;host=myhost;port=3306
-         username=yourusername
-         password=yourpassword
+         username=database_username
+         password=database_password
        </datasource>
 
-Each blocks holds a unique datasource configuration. Apart from some reserved parameters, C<namespace>, C<dsn>, C<username> and C<password> it is up to the user to decide what parameters they want to include in the configuration file. The user can specify the actual name of the datasource using the C<name> parameter provided the block name is an alias. If the C<name> parameter is not found then the block name is assumed to be the actual name of the datasource. In the example above, both Clinical and Clinical1 connect to the same datasource (i.e. Clinical) but with different configurations. Once this class has instantiated the datasource object, the user can access the parameters by simply calling the methods which have the same name as the parameters. For example, the database handle can be retrieved by C<$self-E<gt>dbh()> and id_visit_separator by C<$self-E<gt>id_visit_separator()>. The namespace is the name of the repository housing the datasource.
+Each block holds a unique datasource configuration. In addition to some reserve parameters, C<namespace>, C<name>, C<dsn>, C<username>, C<password>, C<static_tables> and C<visit_max> it is up to the user to decide what other parameters they want to include in the configuration file. The user can specify the actual name of the datasource using the C<name> parameter provided the block name is an alias. If the C<name> parameter is not found the block name is assumed to be the actual name of the datasource. In the example above, both datasourceA and datasourceB connect to the same datasource (i.e. datasourceA) but with different configuration, datasourceA is configured to query the participant data where as, datasourceB can be used to query the instrument data. Once the class has instantiated the datasource object, the user can access the parameters by simply calling the accessors which have the same name as the parameters. For example, the database handle can be retrieved by C<$self-E<gt>dbh> and entity_type by C<$self-E<gt>entity_type>. 
+
+The namespace is the full package name of the inbuilt API the application will use to consult the parent EAV schema. The parameters present in the configuration file can be used by the subclass hooks to provide user or project specific functionality.
 
 =head2 new()
 
-    $object = $datasource_pkg->new();
+    $object = $ds_pkg->new();
 
 Basic constructor.
 
 =head1 PROCESSING
 
-After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. a defined C<$response>), it sets the default parameters, if any ( via L<default_parameters|/default_parameters( $opts, $response )>). The subsequent steps include calling the methods, L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
+After instantiating the datasource object, the class first calls L<authenticate|/authenticate( $opts )> to perform the user authentication. If the authentication is successful (i.e. returns a defined C<$response>), it sets some additional parameters, if any ( via L<additional_params|/additional_params( $opts, $response )>). The subsequent steps include calling the methods; L<entity_structure|/entity_structure()>, L<table_structure|/table_structure()>, L<variable_structure|/variable_structure()>, L<datatype_map|/datatype_map()> and validating the return from each method. Upon successful validation the class attempts to set entity, table and variable specific parameters by invoking the methods below:
 
-=head2 set_entity_parameters( $struct )
+=head2 set_entity_params( $struct )
 
-This method attempts to retrieve the entity parameters, C<entity_count> and C<visit_max> (for longitudinal datasources) from the repository. The method accepts the input from L<entity_structure|/entity_structure()>. 
+This method attempts to retrieve the entity parameters, C<entity_count> and C<visit_max> (for longitudinal datasources) from the database. The method accepts the input from L<entity_structure|/entity_structure()> method of the sub class. 
 
-=head2 set_table_parameters( $struct )
+=head2 set_table_params( $struct )
 
-This method attempts to set the information on tables and their attributes as a hash where, table names are keys and attribute name-value pairs are hash values. The table attributes are read from the C<-columns> field specified under the hash ref from L<table_structure|/table_structure()>.
+This method attempts to set tables and their attributes as a hash where, table names are keys and attribute name-value pairs are values. The table attributes are read from the C<-columns> specified under the hash ref returned from L<table_structure|/table_structure()> method of the sub class.
 
-=head2 set_variable_parameters( $struct )
+=head2 set_variable_params( $struct )
 
-This method attempts to set the information on variables and their attributes as a hash where, keys are table and variable names joined by a dot and, values are the attribute name-value pairs. Instead of using the variable names as keys the method uses the combination of the table and the variable name as keys because,
+This method attempts to set variables and their attributes as a hash where, keys are the combination of table and variable names and, values are the attribute name-value pairs. Instead of using the variable names as keys the method uses the combination of table and variable names because,
 
 =over
 
@@ -571,13 +639,13 @@ the resulting name also contains the name of the table, the variable was recorde
 
 =item b.
 
-distinguishes one variable from the other as sometimes variables from different tables may have the same name (e.g. Subject.Sex and Informant.Sex). 
+distinguishes one variable from the other as some variables across tables may share the same name (e.g. Subject.Sex and Informant.Sex). 
 
 =back
 
 =head2 set_visit_variables()
 
-This method is only called if the datasource is longitudinal. The method attempts to set the visit variables. The visit variables are only valid to dynamic tables and they represent the visit transformation of variables (e.g., V1.Var, V2.Var ... Vmax.Var, Vany.Var and Vlast.Var). The prefix C<V1> represents the first visit of the variable C<var>, C<V2> represents the second visit, C<Vany> implies any visit and C<Vlast> last visit. The L<compare|CohortExplorer::Command::Query::Compare> command allows the use of visit variables when searching for entities of interest.
+This method attempts to set the visit variables. The method is called only if the datasource is longitudinal with data on at least 2 visits. The visit variables are valid to dynamic tables and they represent the visit transformation of variables (e.g., vAny.var, vLast.var, v1.var ... vMax). The prefix C<vAny> implies any visit, C<vLast> last visit, C<v1> first visit and C<vMax> the maximum visit for which the data is available in the database. The L<compare|CohortExplorer::Command::Query::Compare> command allows the use of visit variables when searching for entities of interest.
 
 =head1 SUBCLASS HOOKS
 
@@ -587,13 +655,13 @@ The subclasses override the following hooks:
 
 This method should return a response (a scalar) upon successful authentication otherwise return C<undef>. The method is called with one parameter, C<$opts> which is a hash with application options as keys and their user-provided values as hash values. B<Note> the methods below are only called if the authentication is successful.
 
-=head2 default_parameters( $opts, $response )
+=head2 additional_params( $opts, $response )
 
-This method should return a hash ref containing parameter name-value pairs. The user can run some SQL queries in case the parameters to be added to the datasource object first need to be retrieved from the database. The parameters used in calling this method are:
+This method should return a hash ref containing parameter name-value pairs. Not all parameter values are known in advance so they can not be specified in the datasource configuration file. Sometimes the value of some parameter first needs to be retrieved from the database (e.g.  variables and records a given user has access to). This hook can be used specifically for this purpose. The user can run some SQL queries to retrieve values of the parameters they want to add to the datasource object. The parameters used in calling this method are:
    
-C<$opts> is a hash with application options as keys and their user-provided values as hash values.
+C<$opts> a hash with application options as keys and their user-provided values as hash values.
 
-C<$response> is the response received upon successful authentication. 
+C<$response> a scalar received upon successful authentication. The user may want to use the scalar response to fetch other parameters (if any).
 
 =head2 entity_structure()
 
@@ -611,7 +679,7 @@ C<value>
 
 C<table> 
 
-C<visit> (only required for longitudinal datasources)
+C<visit> (valid to longitudinal datasources)
 
 =item B<-from>
 
@@ -628,21 +696,21 @@ where clauses (see L<SQL::Abstract|SQL::Abstract/WHERE_CLAUSES>)
 The method should return a hash ref defining the table structure in the database. The C<table> in this context implies questionnaires or forms. For example,
 
       {
-          -columns => {
-                        table => "GROUP_CONCAT( DISTINCT form_name )", 
-                        variable_count => "COUNT( field_name )",
-                        label => "element_label"
-          },
-         -from  => "redcap_metadata",
+          -columns => [
+                        table => 'GROUP_CONCAT( DISTINCT form_name )', 
+                        variable_count => 'COUNT( field_name )',
+                        label => 'element_label'
+          ],
+         -from  => 'metadata',
          -where => {
-                     "project_id" => $self->project_id()
+                     project_id => $self->project_id
          },
-        -order_by => "field_order",
-        -group_by => "form_name"
+        -order_by => 'field_order',
+        -group_by => 'form_name'
 
       }
 
-the user should make sure the returned hash ref is able to produce the SQL output like the one below,
+the user should make sure the returned hash ref is able to produce the SQL output like the one below:
 
        +-------------------+-----------------+------------------+
        | table             | variable_count  | label            |
@@ -655,28 +723,28 @@ the user should make sure the returned hash ref is able to produce the SQL outpu
        | completion_data   |               6 | Completion Data  |
        +-------------------+-----------------+------------------+
 
-B<Note> that C<-columns> hash ref must have the key C<table> corresponding to the name of form/questionnaire and others columns are table attributes. It is up to the user to decide what table attributes they think are suitable for the description of tables.
+B<Note> that C<-columns> hash ref must have the key C<table> corresponding to the name of form/questionnaire, others columns are table attributes, it is up to the user to decide what table attributes they think are suitable for the description of tables.
 
 =head2 variable_structure()
 
 This method should return a hash ref defining the variable structure in the database. For example,
 
          {
-             -columns => {
-                            variable => "field_name",
-                            table => "form_name",
-                            label => "element_label"
-                            type => "IF( element_validation_type IS NULL, 'text', element_validation_type)",
+             -columns => [
+                            variable => 'field_name',
+                            table => 'form_name',
+                            label => 'element_label',
                             category => "IF( element_enum like '%, %', REPLACE( element_enum, '\\\\n', '\n'), '')",
-             },
-            -from => "redcap_metadata",
+                            type => "IF( element_validation_type IS NULL, 'text', element_validation_type)"
+             ],
+            -from => 'metadata',
             -where => { 
-                        "project_id" => $self->project_id()
+                        project_id => $self->project_id
              },
-             -order_by => "field_order"
+             -order_by => 'field_order'
          }
 
-the user should make sure the returned hash ref is able to produce the SQL output like the one below,
+the user should make sure the returned hash ref is able to produce the SQL output like the one below:
 
        +---------------------------+---------------+-------------------------+---------------+----------+
        | variable                  | table         |label                    | category      | type     |
@@ -690,11 +758,11 @@ the user should make sure the returned hash ref is able to produce the SQL outpu
        | creat_1                   | month_1_data  | Creatinine (mg/dL)      |               | float    |
        +---------------------------+---------------+-----------+-------------------------------+--------+
 
-B<Note> that C<-columns> hash ref must have the key C<variable> and C<table>. Again it is up to the user to decide what variable attributes (i.e. meta data) they think define the variables in the datasource. The categories in C<category> should be separated by newline.          
+B<Note> that C<-columns> array ref must contain elements C<variable> and C<table>. Again it is up to the user to decide what variable attributes (i.e. meta data) they think define the variables in the datasource. The categories within C<category> must be separated by newline.          
           
 =head2 datatype_map()
 
-This method should return a hash ref with variable type as keys and equivalent SQL type (i.e. castable) as value.
+This method should return a hash ref with variable type as keys and equivalent SQL type (i.e. castable) as value. For example, in some datasource the datatype int can be converted to database signed and float to decimal. By default, all variable values are assumed to be varchar(255).
 
 =head1 DIAGNOSTICS
 
@@ -710,11 +778,11 @@ Failed to instantiate datasource package '<datasource pkg>' via new().
 
 =item *
 
-The return from methods C<default_parameters>, C<entity_structure>, C<table_structure>, C<variable_structure> and C<datatype_map> is either not hash worthy or incomplete.
+The return from methods C<additional_params>, C<entity_structure>, C<table_structure>, C<variable_structure> and C<datatype_map> is either not hash worthy or contains missing columns.
 
 =item *
 
-The C<select> method from L<SQL::Abstract::More> fails to construct the SQL from the supplied hash ref.
+The C<select> method from L<SQL::Abstract::More> fails to construct the SQL query from the supplied hash ref.
 
 =item *
 
@@ -742,9 +810,7 @@ L<Tie::IxHash>
 
 L<CohortExplorer>
 
-L<CohortExplorer::Application::Opal::Version::1::Datasource>
-
-L<CohortExplorer::Application::Opal::Version::2::Datasource>
+L<CohortExplorer::Application::Opal::Datasource>
 
 L<CohortExplorer::Application::REDCap::Datasource>
 

@@ -1,11 +1,10 @@
 Changes
 config_files/datasource-config.properties
 config_files/log-config.properties
-debian/cohortexplorer_0.10-1_all.deb
+debian/cohortexplorer_0.11-1_all.deb
 lib/CohortExplorer.pm
 lib/CohortExplorer/Application.pm
-lib/CohortExplorer/Application/Opal/Version/1/Datasource.pm
-lib/CohortExplorer/Application/Opal/Version/2/Datasource.pm
+lib/CohortExplorer/Application/Opal/Datasource.pm
 lib/CohortExplorer/Application/REDCap/Datasource.pm
 lib/CohortExplorer/Command/Describe.pm
 lib/CohortExplorer/Command/Find.pm

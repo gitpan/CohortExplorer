@@ -54,3 +54,16 @@ Revision history for CohortExplorer
         - Added support for SQL datasources (Opal version 2.0)
 
         - Minor documentation changes  
+
+0.11   2014-07-10
+
+        - Bug fixed within 'find' command REDCap API
+  
+        - Added support for group permission in REDCap API. Now the users belonging to some group can only view records 
+          created by their group.
+          
+        - Improved syntax for imposing conditions in search and compare command. 
+
+        - Improved logging
+
+        - Documentation changes  

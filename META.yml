@@ -39,8 +39,9 @@ requires:
   Text::ASCIITable: 0.20
   Text::CSV_XS: 0.97
   Tie::IxHash: 1.21
+  Tie::Autotie: 0
   Time::HiRes: 0
   perl: 5.010
 resources:
    license: http://dev.perl.org/licenses/
-version: 0.10
+version: 0.11
