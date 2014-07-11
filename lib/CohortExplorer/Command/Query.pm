@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 500;
@@ -87,7 +87,7 @@ sub validate {
 
 	if ( !$opts->{out} || !-d $opts->{out} || !-w $opts->{out} ) {
 		throw_cmd_validation_exception( error =>
-                 "Option 'out' is required, the export directory within the 'out' option must exist with RWX enabled (i.e. chmod 777) for CohortExplorer"
+                 "Option 'out' is required. The directory specified in 'out' option must exist with RWX enabled (i.e. chmod 777) for CohortExplorer"
 		);
 	}
 
@@ -104,7 +104,7 @@ sub validate {
 
 	my $ds = $cache->{datasource};
 
-	# Match table names supplied within the export option to
+	# Match table names supplied in the export option to
 	# datasource tables and throw exception if they don't match
 	if ( $opts->{export} ) {
 		my $tables = $ds->tables;
@@ -133,7 +133,7 @@ sub validate {
 		# Throw exception if entity_id/visit are supplied as an argument
 		if ( $v =~ /^(entity_id|visit)$/ ) {
 			throw_cmd_validation_exception( error =>
-            "entity_id and visit (if applicable) are already part of the query set"
+                         "entity_id and visit (if applicable) are already part of the query set"
 			);
 		}
 
@@ -180,13 +180,13 @@ sub validate {
 
 			else {
 				throw_cmd_validation_exception(
-					error => "Invalid condition on '$v'" );
+					error => "Invalid condition on variable '$v'" );
 			}
 		}
 
 		else {
 			throw_cmd_validation_exception(
-				error => "Invalid condition on '$v'" );
+				error => "Invalid condition on variable '$v'" );
 		}
 	}
 }
@@ -493,7 +493,7 @@ sub export {
 
 		$sth = $ds->dbh->prepare_cached($stmt);
 
-                # The user might have supplied multiple conditions within the where clause
+                # The user might have supplied multiple conditions in the where clause
                 # of entity_structure() method so split the $stmt by '?' and get the index of
                 # 'table' placeholder
 		my @chunk = split /\?/, $stmt;
@@ -732,19 +732,19 @@ This method is responsible for the overall functioning of the command. The metho
 
 =head2 process( $opts, @args )
 
-The method attempts to query the database using the SQL constructed from the hash ref returned from L<create_query_params|/create_query_params( $opts, @args )>. Upon successful execution of the SQL query the method returns the result set (i.e. C<$rs>) which is a ref to array of arrays where each array corresponds to data on one entity or entity-visit combination (if applicable).
+The method attempts to construct the SQL query from the hash ref returned by L<create_query_params|/create_query_params( $opts, @args )>. Upon successful execution of the SQL query the method returns the result set (C<$rs>) which is a ref to array of arrays where each array corresponds to data on one entity or entity-visit combination (if applicable).
 
 =head2 save_command( $opts, @args)
 
-This method is only called if the user has specified the save command option (i.e. C<--save-command>). The method first constructs the command from command options and arguments (i.e. C<$opts> and C<@args>) and adds to the C<$COMMAND_HISTORY> hash along with the datetime information. The C<$COMMAND_HISTORY> contains all commands previously saved by the user. 
+This method is only called if the user has specified the save command option (C<--save-command>). The method first constructs the command from command options and arguments (C<$opts> and C<@args>) and adds the command to C<$COMMAND_HISTORY> hash along with the datetime information. C<$COMMAND_HISTORY> contains all commands previously saved by the user. 
 
 =head2 export( $opts, $rs, $dir, @args )
 
-This method creates an output directory under the directory specified by the C<--out> option and calls L<process_result|/process_result( $opts, $rs, $dir, @args )> method in the subclass. Further processing by the method depends on the presence of C<--export> option(s). If the user has provided the C<--export> option, the method first constructs the SQL query from the hash ref returned from L<entity_structure|CohortExplorer::Datasource/entity_structure()> with a placeholder for table name. The method executes the same SQL query with a different bind value (i.e. table name) depending on the number of tables to be exported. The output obtained from successful execution of SQL is passed to L<process_table|/process_table( $table, $td, $dir, $rs_entity )> for further processing.
+This method creates a export directory in the directory specified by C<--out> option and calls L<process_result|/process_result( $opts, $rs, $dir, @args )> method in the subclass. Further processing by the method depends on the presence of C<--export> option(s). If the user has specified C<--export> option, the method first constructs the SQL query from the hash ref returned by L<entity_structure|CohortExplorer::Datasource/entity_structure()> with a placeholder for table name. The method executes the same SQL query with a different bind value (table name) depending on the number of tables to be exported. The output obtained from successful execution of SQL is passed to L<process_table|/process_table( $table, $td, $dir, $rs_entity )> for further processing.
 
 =head2 summary_stats( $opts, $rs, $dir )
 
-This method is only called if the user has specified summary statistics (i.e. C<--stats>) option. The method attempts to calculate statistics from the data frame returned from L<create_dataset|/create_dataset( $rs )>.
+This method is only called if the user has specified summary statistics option (C<--stats>). The method attempts to calculate statistics from the data frame returned by L<create_dataset|/create_dataset( $rs )>.
 
 
 =head1 SUBCLASS HOOKS
@@ -759,7 +759,7 @@ This method should return a ref to the list of variables for validating argument
 
 =head2 create_query_params( $opts, @args )
 
-This method should return a hash ref with keys, C<static>, C<dynamic>, or both depending on the datasource type and variables supplied within arguments and conditions. As standard datasource only contains static tables so the hash ref must contain only one key, C<static> where as a longitudinal datasource may contain both keys, C<static> and C<dynamic> provided the datasource has static tables. The value of each key comprises of SQL parameters such as C<-from>, C<-where>, C<-group_by> and C<-order_by>. The parameters to this method are as follows:
+This method should return a hash ref with keys, C<static>, C<dynamic>, or both depending on the datasource type and variables supplied as arguments and conditions. As standard datasource only contains static tables so the hash ref must contain only one key, C<static> where as a longitudinal datasource may contain both keys, C<static> and C<dynamic> provided the datasource has static tables. The value of each key comprises of SQL parameters such as C<-from>, C<-where>, C<-group_by> and C<-order_by>. The parameters to this method are as follows:
 
 C<$opts> an options hash with the user-provided command options as keys and their values as hash values.
 
@@ -767,7 +767,7 @@ C<@args> arguments to the command.
 
 =head2 process_result( $opts, $rs, $dir, @args )
 
-This method should process the result set obtained after running the SQL query and write a csv file. If the variables provided as part of arguments and conditions belong to static tables, the method should return a ref to list of entities present in the result set otherwise, the method should return a hash ref with C<entity_id> as keys and their visit numbers as values.
+This method should process the result set obtained after running the SQL query and write the results into a csv file. If the variables provided as arguments and conditions belong to static tables, the method should return a ref to list of entities present in the result set otherwise return a hash ref with C<entity_id> as keys and their visit numbers as values.
 
 In this method, 
 
@@ -791,7 +791,7 @@ C<$ts> is the table set obtained from executing the table export SQL query.
 
 C<$dir> is the export directory.
 
-C<$rs_entity> is a ref to a list/hash of all entities present in the result set.
+C<$rs_entity> is a ref to a list/hash containing entities present in the result set.
 
 =head2 create_dataset( $rs )
 
@@ -815,15 +815,15 @@ The command history file fails to load. For the save command option to work it i
 
 =item *
 
-The C<select> method from L<SQL::Abstract::More> fails to construct the SQL from the supplied hash ref.
+C<select> method in L<SQL::Abstract::More> fails to construct the SQL from the supplied hash ref.
 
 =item *
 
-The method C<execute> from L<DBI> fails to execute the SQL query.
+C<execute> method in L<DBI> fails to execute the SQL query.
 
 =item *
 
-The full methods under package L<Statistics::Descriptive> fail to calculate statistics.
+The full methods in package L<Statistics::Descriptive> fail to calculate statistics.
 
 =back
 

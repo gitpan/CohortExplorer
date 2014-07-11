@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CohortExplorer::Datasource);
 
@@ -267,7 +267,7 @@ The class is inherited from L<CohortExplorer::Datasource> and overrides the foll
 
 =head2 authenticate( $opts )
 
-This method authenticates the user by running the authentication query against the REDCap database. The successful authentication returns hash ref containing C<project_id>, C<data_export_tool> and C<group_id>. In order to use CohortExplorer with REDCap the user must have the permission to export data in REDCap (i.e. C<data_export_tool != 0>). At present the application only supports the standard REDCap table authentication.
+This method authenticates the user by running the authentication query against the REDCap database. The successful authentication returns hash ref containing C<project_id>, C<data_export_tool> and C<group_id>. In order to use CohortExplorer with REDCap the user must have the permission to export data in REDCap (C<data_export_tool != 0>). At present the application only supports the standard REDCap table authentication.
 
 =head2 additional_params( $opts, $response )
 
@@ -275,15 +275,15 @@ This method adds the authentication response to the datasource object. The metho
 
 =head2 entity_structure()
 
-This method returns a hash ref defining the entity structure. The method uses the C<init_event_id> parameter set in C<additional_params> to define C<visit> column for the longitudinal datasources. The hash ref contains the condition for the inclusion/exclusion of records.
+This method returns a hash ref defining the entity structure. The method uses C<init_event_id> parameter set in C<additional_params> to define C<visit> column for the longitudinal datasources. The hash ref contains the condition for the inclusion and exclusion of records.
 
 =head2 table_structure() 
 
-This method returns a hash ref defining the table structure. The C<-columns> key within the table structure depends on the datasource type. For standard datasources the C<-columns> key includes C<table>, C<label> and C<variable_count> where as for longitudinal datasources it comprises of C<table>, C<arm>, C<variable_count>, C<label>, C<event_count> and C<event_description>.
+This method returns a hash ref defining the table structure. C<-columns> key within the table structure depends on the datasource type. For standard datasources C<-columns> key includes table attributes such as C<table>, C<label> and C<variable_count> where as for longitudinal datasources it comprises of C<table>, C<arm>, C<variable_count>, C<label>, C<event_count> and C<event_description>.
 
 =head2 variable_structure()
 
-This method returns a hash ref defining the variable structure. The hash ref uses the C<data_export_tool> parameter set in C<additional_params> to specify condition for the inclusion/exclusion of variables tagged as identifiers. The variable attributes include columns such as C<table>, C<unit>, C<type>, C<category> and C<label>.
+This method returns a hash ref defining the variable structure. The hash ref uses C<data_export_tool> parameter set in C<additional_params> to specify condition for the inclusion and exclusion of variables tagged as identifiers. The variable attributes include columns such as C<table>, C<unit>, C<type>, C<category> and C<label>.
 
 =head2 datatype_map()
 

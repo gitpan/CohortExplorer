@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -20,14 +20,14 @@ sub usage_text {
               
               NOTES
                  The variables entity_id and visit (if applicable) must not be provided as arguments as they are already part of
-                 the query-set. However, the user can impose conditions on both the variables.
+                 the query-set. However, the user can impose conditions on both variables.
 
                  Other variables in arguments/cond (option) must be referenced as <table>.<variable>.
 
-                 The conditions can be imposed using the operators: =, !=, >, <, >=, <=, between, not_between, like, not_like, 
+                 The conditions can be imposed using the operators such as =, !=, >, <, >=, <=, between, not_between, like, not_like, 
                  in, not_in, regexp and not_regexp. The keyword undef can be used to search for null values.
 
-                 The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
+                 The directory specified in 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
 
               EXAMPLES
@@ -334,7 +334,7 @@ B<s [OPTIONS] [VARIABLE]>
 
 =head1 DESCRIPTION
 
-The search command enables the user to search entities using the variables of interest. The user can also impose conditions on the variables. Moreover, the command also enables the user to view summary statistics and export the data in csv format. The command is available to both standard/cross-sectional and longitudinal datasources.
+The search command enables the user to search entities using the variables of interest. The user can also impose conditions on the variables. Moreover, the command also enables the user to view summary statistics and export data in csv format. The command is available to both standard/cross-sectional and longitudinal datasources.
 
 This class is inherited from L<CohortExplorer::Command::Query> and overrides the following methods:
 
@@ -348,19 +348,19 @@ This method returns a ref to the list of variables for validating arguments and 
 
 =head2 create_query_params( $opts, @args )
 
-This method returns a hash ref with keys, C<static>, C<dynamic> or both depending on the datasource type and variables supplied within arguments and conditions. The value of each key is a hash containing SQL parameters; C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
+This method returns a hash ref with keys, C<static>, C<dynamic> or both depending on the datasource type and variables supplied as arguments and conditions. The value of each key is a hash containing SQL parameters such as C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
 
 =head2 process_result( $opts, $rs, $dir, @args ) 
         
-This method returns a hash ref with keys as C<entity_id> and values include a list of visit numbers provided the result-set contains visit column (dynamic tables), or empty list (static tables).
+This method returns a hash ref with keys as C<entity_id> and values can be a list of visit numbers provided the result-set contains visit column (dynamic tables), or empty list (static tables).
 
 =head2 process_table( $table, $ts, $dir, $rs_entity ) 
         
-This method writes the table set (i.e. C<$ts>) into a csv file. The data includes C<entity_id> of all entities present in the result set followed by values of all variables. In case of dynamic tables the csv also contains C<visit> column.
+This method writes the table set (C<$ts>) into a csv file. The data includes C<entity_id> of all entities present in the result set followed by values of all variables. In case of dynamic tables the csv also contains C<visit> column.
 
 =head2 create_dataset( $rs )
         
-This method returns a hash ref with C<visit> as keys and variable-value hash as its value provided, the query set contains at least one dynamic variable. For all other cases it simply returns a hash ref with variable-value pairs.
+This method returns a hash ref with C<visit> as keys and variable-value hash as its value provided the query set contains at least one dynamic variable. For all other cases it simply returns a hash ref with variable name-value pairs.
   
 =head1 OPTIONS
 
@@ -394,9 +394,9 @@ Impose conditions using the operators: C<=>, C<!=>, C<E<gt>>, C<E<lt>>, C<E<gt>=
 
 =head1 NOTES
 
-The variables C<entity_id> and C<visit> (if applicable) must not be provided as arguments as they are already part of the query-set.  However, the user can impose conditions on both the variables.
+The variables C<entity_id> and C<visit> (if applicable) must not be provided as arguments as they are already part of the query-set.  However, the user can impose conditions on both variables.
 
-The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
+The directory specified in C<out> option must have RWX enabled for CohortExplorer.
 
 =head1 EXAMPLES
 

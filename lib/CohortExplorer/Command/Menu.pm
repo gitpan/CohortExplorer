@@ -3,7 +3,7 @@ package CohortExplorer::Command::Menu;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw( CLI::Framework::Command::Menu );
 
@@ -42,7 +42,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Menu - CohortExplorer class to show a command menu
+CohortExplorer::Command::Menu - CohortExplorer class to show a command menu including the commands that are available to the running application
 
 =head1 DESCRIPTION
 
@@ -50,6 +50,6 @@ This class is inherited from L<CLI::Framework::Command::Menu> and overrides C<me
 
 =head2 menu_txt()
 
-This method creates a command menu including the commands that are available to the running application. Only a small modification has been made to the original code so that the menu includes command aliases with command names.
+This method creates a command menu including the commands that are available to the running application. Only a small modification has been made to the original code so the menu includes command aliases with command names.
 
 =cut

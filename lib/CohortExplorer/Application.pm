@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -530,7 +530,7 @@ This method returns the application option specifications as expected by L<Getop
 
 =head2 validate_options( $opts )
 
-This method ensures the user has supplied all mandatory options (i.e. datasource, username and password).
+This method ensures the user has supplied all mandatory options such as datasource, username and password.
 
 =head2 command_map()
 
@@ -560,7 +560,7 @@ This method returns mapping between command aliases and command names
 
 =head2 pre_dispatch( $command )
 
-This method ensures invalid commands do not dispatch and logs all commands dispatched successfully.
+This method ensures the invalid commands do not dispatch and logs all commands successfully dispatched.
 
 =head2 noninteractive_commands()
 

@@ -3,7 +3,7 @@ package CohortExplorer::Command::Describe;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -78,7 +78,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Describe - CohortExplorer class to describe datasource
+CohortExplorer::Command::Describe - CohortExplorer class to print datasource description
 
 =head1 SYNOPSIS
 
@@ -88,9 +88,9 @@ B<d>
 
 =head1 DESCRIPTION
 
-The class is inherited from L<CLI::Framework::Command> and overrides the following hooks:
+The class is inherited from L<CLI::Framework::Command> and overrides the following methods:
 
-=head2  usage_text()
+=head2 usage_text()
 
 This method returns the usage information for the command.
 

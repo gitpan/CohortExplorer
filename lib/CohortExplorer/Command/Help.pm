@@ -4,7 +4,7 @@ use base qw( CLI::Framework::Command::Meta );
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 #-------
 
@@ -72,7 +72,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::Help - CohortExplorer class to show application or command specific usage
+CohortExplorer::Command::Help - CohortExplorer class to print application or command specific usage
 
 =head1 DESCRIPTION
 
@@ -84,6 +84,6 @@ This method returns the usage information for the help command.
 
 =head2 run( $opts, @args )
 
-The method returns application or command specific usage. Only a small modification has been made to the original code so that the application usage only includes the usage information on valid commands.
+The method returns application or command specific usage. Only a small modification has been made to the original code so the application usage only includes the usage information on valid commands.
 
 =cut

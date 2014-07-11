@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -18,7 +18,7 @@ sub usage_text {
 
          
            By default, the command returns variables that contain either of the keywords in at least one of their attributes.
-           The user can override this setting by specifying the 'and' option.
+           The user can override this setting by specifying 'and' option.
 
            EXAMPLES
              
@@ -216,7 +216,7 @@ Validates the command options and arguments and throws exception if validation f
 
 =head2 run( $opts, @args )
 
-This method enables the user to search variables using keywords. The command looks for the presence of keywords in columns specified in L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the sub class. The command attempts to print the variable dictionary (i.e. meta data) of variables meeting the search criteria. The variable dictionary can include the following variable attributes:
+This method enables the user to find variables using keywords. The command looks for the presence of keywords in columns specified in L<variable_structure|CohortExplorer::Datasource/variable_structure()> method of the sub class. The command attempts to print the variable dictionary (i.e. meta data) of variables meeting the search criteria. The variable dictionary can include the following variable attributes:
 
 =over
 
@@ -238,7 +238,7 @@ unit
 
 =item 5
 
-categories (if any) separated by newline 
+categories (if any) separated by newlines 
 
 =item 6
 
@@ -278,17 +278,17 @@ C<throw_cmd_run_exception>: This exception is thrown if one of the following con
 
 =item *
 
-The C<select> method from L<SQL::Abstract::More> fails to construct the SQL query from the supplied hash ref.
+C<select> method in L<SQL::Abstract::More> fails to construct the SQL query from the supplied hash ref.
 
 =item *
 
-The method C<execute> from L<DBI> fails to execute the SQL query.
+C<execute> method in L<DBI> fails to execute the SQL query.
 
 =back
 
 =item 2
 
-C<throw_cmd_validation_exception>: This exception is thrown if the user has not supplied any arguments/keywords to the command. The command expects at least one argument.
+C<throw_cmd_validation_exception>: This exception is thrown if the user has not supplied any arguments/keywords to the command. The command expects at least one keyword.
 
 =back
 

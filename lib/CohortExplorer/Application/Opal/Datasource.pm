@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CohortExplorer::Datasource);
 use JSON qw( decode_json );
@@ -244,10 +244,10 @@ sub variable_structure {
 		-columns => [
 
 			variable => 'GROUP_CONCAT( DISTINCT var.name )',
-			table    => 'GROUP_CONCAT( DISTINCT vt.name )',
-			type     => 'GROUP_CONCAT( DISTINCT var.value_type )',
+			table  => 'GROUP_CONCAT( DISTINCT vt.name )',
+			type  => 'GROUP_CONCAT( DISTINCT var.value_type )',
 			unit => "GROUP_CONCAT( DISTINCT IF( varatt.name = 'unitLabel' AND varatt.name IS NOT NULL, varatt.value, IF( var.unit IS NOT NULL, var.unit, '' )) SEPARATOR '')",
-			category => "GROUP_CONCAT( DISTINCT CONCAT( cat.name, ', ', catatt.value ) SEPARATOR '\\n')",
+			category => "GROUP_CONCAT( DISTINCT IF( var.value_type = 'boolean', 'true, True\\nfalse, False', CONCAT( cat.name, ', ', catatt.value ) ) SEPARATOR '\\n')",
 			validation => "GROUP_CONCAT( DISTINCT IF( varatt.name = 'validation', REPLACE( SUBSTRING_INDEX( varatt.value,',', 2), 'Number.', ''), NULL) SEPARATOR '')",
 			label => "GROUP_CONCAT( DISTINCT IF( varatt.name = 'label', varatt.value, '' ) SEPARATOR ' ')",
 		],
@@ -306,7 +306,7 @@ This method returns a hash ref containing all configuration specific parameters.
 
 =head2 entity_structure()
 
-This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining the C<entity_id> and C<visit> on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. The C<id_visit_separator> can also be a string (e.g. PARTIOP1, PARTIOP2).
+This method returns a hash ref defining the entity structure. The datasources in Opal are strictly standard but they can be easily made longitudinal by joining C<entity_id> and C<visit> on C<id_visit_separator> (default C<_>). For example, PART001_1, implies the first visit of the participant PART001 and PART001_2 implies the second visit. C<id_visit_separator> can also be a string (e.g. PARTIOP1, PARTIOP2).
 
 =head2 table_structure()
 

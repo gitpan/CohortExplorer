@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -20,7 +20,7 @@ sub usage_text {
 
                 NOTES
                    The variables entity_id and visit (if applicable) must not be provided as arguments as they are already part of the
-                   query-set. However, the user can impose conditions on both the variables.
+                   query-set. However, the user can impose conditions on both variables.
 
                    Other variables in arguments/cond (option) must be referenced as <table>.<variable> or <visit>.<table>.<variable> where
                    visit can be vAny, vLast, v1, v2, v3 ... vMax. Here vMax is the maximum visit number for which data is available.
@@ -31,7 +31,7 @@ sub usage_text {
                    When condition is imposed on variable with no prefix such as vAny, vLast, v1, v2 and v3 the command assumes the
                    condition applies to all visits of the variable.
 
-                   The directory specified within the 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
+                   The directory specified in 'out' option must have RWX enabled (i.e. chmod 777) for CohortExplorer.
 
 
                 EXAMPLES
@@ -499,7 +499,7 @@ B<c [OPTIONS] [VARIABLE]>
 
 =head1 DESCRIPTION
 
-The compare command enables the user to compare entities across visits. The user can also impose conditions on variables. Moreover, the command also enables the user to view summary statistics and export the data in csv format. The command is only available to longitudinal datasources with data on at least 2 visits.
+The compare command enables the user to compare entities across visits. The user can also impose conditions on variables. Moreover, the command also enables the user to view summary statistics and export data in csv format. The command is only available to longitudinal datasources with data on at least 2 visits.
 
 This class is inherited from L<CohortExplorer::Command::Query> and overrides the following methods:
 
@@ -513,7 +513,7 @@ This method returns a ref to the list containing all variables (including visit 
 
 =head2 create_query_params( $opts, @args )
 
-This method returns a hash ref with keys, C<static>, C<dynamic> or both depending on the variables supplied within arguments and conditions. The value of each key is a hash containing SQL parameters, C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
+This method returns a hash ref with keys, C<static>, C<dynamic> or both depending on the variables supplied as arguments and conditions. The value of each key is a hash containing SQL parameters such as C<-columns>, C<-from>, C<-where>, C<-group_by> and C<-having>.
 
 =head2 process_result( $opts, $rs, $dir, @args )
      
@@ -525,7 +525,7 @@ This method writes the table data into a csv file. The data includes C<entity_id
 
 =head2 create_dataset( $rs )
 
-This method returns a hash ref with C<entity_id> as keys and variable-value pairs as its value. The statistics in this command are calculated with respect to the C<entity_id> and the number of observations for each variable is the number of times (or visits) each variable was recorded for each entity during the course of the study.
+This method returns a hash ref with C<entity_id> as keys and variable name-value pairs as values. The statistics in this command are calculated with respect to C<entity_id> and the number of observations for each variable is the number of times (or visits) each variable was recorded for each entity during the course of the study.
  
 =head1 OPTIONS
 
@@ -562,9 +562,9 @@ The keyword C<undef> can be used to specify null.
 =head1 NOTES
 
 The variables C<entity_id> and C<visit> (if applicable) must not be provided as arguments as they are already part of the query-set.
-However, the user can impose conditions on both the variables. Other variables in arguments and conditions must be referenced as C<table.variable> or C<visit.table.variable> where visit = C<vAny>, C<vLast>, C<v1>, C<v2>, c<v3> ... C<vMax>. Here vMax is the maximum visit number for which the data is available. When a condition is imposed on a variable with no prefix such as C<vAny>, C<vLast>, C<v1>, C<v2> and c<v3> the command assumes the condition applies to all visits of the variable.
+However, the user can impose conditions on both variables. Other variables in arguments and conditions must be referenced as C<table.variable> or C<visit.table.variable> where visit = C<vAny>, C<vLast>, C<v1>, C<v2>, c<v3> ... C<vMax>. Here vMax is the maximum visit number for which data is available. When a condition is imposed on a variable with no prefix such as C<vAny>, C<vLast>, C<v1>, C<v2> and c<v3> the command assumes the condition applies to all visits of the variable.
 
-The directory specified within the C<out> option must have RWX enabled for CohortExplorer.
+The directory specified in C<out> option must have RWX enabled for CohortExplorer.
 
 =head1 EXAMPLES
 

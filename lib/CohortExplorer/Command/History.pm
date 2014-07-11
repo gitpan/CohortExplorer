@@ -3,7 +3,7 @@ package CohortExplorer::Command::History;
 use strict;
 use warnings;
 
-our $VERSION = 0.11;
+our $VERSION = 0.12;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -89,7 +89,7 @@ __END__
 
 =head1 NAME
 
-CohortExplorer::Command::History - CohortExplorer class to show command history
+CohortExplorer::Command::History - CohortExplorer class to print command history
 
 =head1 SYNOPSIS
 
@@ -132,7 +132,7 @@ mutually exclusive options (i.e. show and clear) are specified together
 
 This method performs option specific processing.
 
-This class imports the variable C<$COMMAND_HISTORY> from L<CohortExplorer::Command::Query> to load user's search history. The history command enables the user to keep track of previously saved commands and use the information (i.e. options and arguments) to build new commands.
+This class imports the variable C<$COMMAND_HISTORY> from L<CohortExplorer::Command::Query> to load user's saved commands. The history command enables the user to keep track of previously saved commands and use the information such as options and arguments to build new commands.
 
 =head1 OPTIONS
 
