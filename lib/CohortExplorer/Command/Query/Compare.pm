@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Compare;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -130,19 +130,19 @@ sub create_query_params {
 
 		else {
 
-	                # Build conditions for visit variables e.g. v1.var, vLast.var, vAny.var etc.
-	                # Values inside array references are joined as 'OR' and hashes as 'AND'
+	  # Build conditions for visit variables e.g. v1.var, vLast.var, vAny.var etc.
+	  # Values inside array references are joined as 'OR' and hashes as 'AND'
 			my @visit_var =
 			  grep( /^(v(Any|Last|[0-9]+)\.$v|$v)$/, keys %{ $opts->{cond} } );
 
 			for my $vv ( sort @visit_var ) {
 
-				# Parse condition
+				# Parse conditions
 				my @cond = grep ( s/^\s*|\s*$//g, $csv->fields )
 				  if ( $csv->parse( $opts->{cond}{$vv} ) );
 
-                                # Last visits (i.e. vLast) for entities are not known in advance so practically any
-                                # visit can be the last visit for any entity
+    # Last visits (i.e. vLast) for entities are not known in advance so practically any
+    # visit can be the last visit for any entity
 				if ( $vv =~ /^(vLast\.$v)$/ ) {
 					if ( defined $param{$table_type}{-having}{-or} ) {
 						map {
@@ -215,8 +215,8 @@ sub create_query_params {
 					}
 				}
 
-                                # When condition is imposed on a variable (with no prefix v1, v2, vLast, vAny)
-                                # assume condition applies to all visits of the variable (i.e. 'AND' case)
+    # When condition is imposed on a variable (with no prefix v1, v2, vLast, vAny)
+    # assume condition applies to all visits of the variable (i.e. 'AND' case)
 				else {
 					map {
 						$param{$table_type}{-having}{"`v$_.$v`"} = [
@@ -240,7 +240,7 @@ sub create_query_params {
 
 		else {
 
-		        # entity_id and visit are added to the list of SQL cols in dynamic param
+		 # entity_id and visit are added to the list of SQL cols in dynamic param
 			unshift @{ $param{$_}{-columns} },
 			  (
 				$struct->{-columns}{entity_id} . ' AS `entity_id`',
@@ -302,10 +302,10 @@ sub process_result {
 
 	my ( $self, $opts, $rs, $dir, @args ) = @_;
 
-        # Header of the csv must pay attention to args and variables on which the condition is imposed
-        # Extract visit specific variables from the result-set based on the variables provided as args/cond (option).
-        # Say, variables in args/cond variables are v1.var and vLast.var but as the result-set contains all visits of
-        # the variable 'var' so discard v2.var and v3.var and select v1.var and the equivalent vLast.var
+    # Header of the csv must pay attention to args and variables on which the condition is imposed
+    # Extract visit specific variables from the result-set based on the variables provided as args/cond (option).
+    # Say, variables in args/cond variables are v1.var and vLast.var but as the result-set contains all visits of
+    # the variable 'var' so discard v2.var and v3.var and select v1.var and the equivalent vLast.var
 	my $index = $rs->[0][3] && $rs->[0][3] eq 'visit' ? 3 : 0;
 
 	# Compiling regex to extract variables specified as args/cond (option)
@@ -325,7 +325,7 @@ sub process_result {
 
 	my @var = @{ $rs->[0] }[@index_to_use];
 
-        # Extract last visit specific variables (i.e. vLast.var) in args/cond (option)
+    # Extract last visit specific variables (i.e. vLast.var) in args/cond (option)
 	my @last_visit_var = keys %{
 		{
 			map { $_ => 1 }
@@ -562,7 +562,7 @@ The keyword C<undef> can be used to specify null.
 =head1 NOTES
 
 The variables C<entity_id> and C<visit> (if applicable) must not be provided as arguments as they are already part of the query-set.
-However, the user can impose conditions on both variables. Other variables in arguments and conditions must be referenced as C<table.variable> or C<visit.table.variable> where visit = C<vAny>, C<vLast>, C<v1>, C<v2>, c<v3> ... C<vMax>. Here vMax is the maximum visit number for which data is available. When a condition is imposed on a variable with no prefix such as C<vAny>, C<vLast>, C<v1>, C<v2> and c<v3> the command assumes the condition applies to all visits of the variable.
+However, the user can impose conditions on both variables. Other variables in arguments and conditions must be referenced as C<table.variable> or C<visit.table.variable> where visit = C<vAny>, C<vLast>, C<v1>, C<v2>, C<v3> ... C<vMax>. Here vMax is the maximum visit number for which data is available. When a condition is imposed on a variable with no prefix such as C<vAny>, C<vLast>, C<v1>, C<v2> and C<v3> the command assumes the condition applies to all visits of the variable.
 
 The directory specified in C<out> option must have RWX enabled for CohortExplorer.
 

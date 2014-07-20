@@ -3,7 +3,7 @@ package CohortExplorer::Application::Opal::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CohortExplorer::Datasource);
 use JSON qw( decode_json );
@@ -41,7 +41,7 @@ sub authenticate {
 
 		if ( $decoded_json->{type} ne 'mongodb' ) {
 
-	                # Successful authentication returns tables and views accessible to the user
+	  # Successful authentication returns tables and views accessible to the user
 			my %views = map { $_ => 1 } @{ $decoded_json->{view} || [] };
 			my @tables = @{ $decoded_json->{table} || [] };
 
@@ -95,7 +95,7 @@ sub additional_params {
 
 		$params{id_visit_separator} = $self->id_visit_separator || '_';
 
-                # Get static tables (if any) from datasource-config.properties and check them against @allowed_tables
+  # Get static tables (if any) from datasource-config.properties and check them against @allowed_tables
 		my @static_table = ();
 		my %table = map { $_ => 1 } @{ $params{allowed_tables} };
 		$params{static_tables} = $self->static_tables || undef;
@@ -191,7 +191,7 @@ sub entity_structure {
 		}
 	);
 
-    # For longitudinal datasources split identifier into entity_id and visit using id_split_separator
+ # For longitudinal datasources split identifier into entity_id and visit using id_split_separator
 	if ( $self->type eq 'longitudinal' ) {
 		my $id_visit_sep = $self->id_visit_separator;
 		$struct{-columns}->[1] =
@@ -200,7 +200,7 @@ sub entity_structure {
 		# Check for the presence of id_visit_sep
 		push @{ $struct{-columns} },
 		  (
-			'visit',
+			  'visit',
              "SUBSTRING_INDEX( ve.identifier, '$id_visit_sep', IF ( ve.identifier RLIKE '$id_visit_sep\[0-9\]+\$', -1, NULL ) )"
 		  );
 	}

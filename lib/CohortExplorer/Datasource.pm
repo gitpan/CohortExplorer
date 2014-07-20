@@ -3,7 +3,7 @@ package CohortExplorer::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use Carp;
 use Config::General;
@@ -108,8 +108,8 @@ sub _process {
                  "Initializing application for $opts->{username}\@$opts->{datasource} ...\n";
 	}
 
-        # Response is passed to additional_params as it may contain
-        # some data which the subclass hook can use to fetch other paramaters
+ # Response is passed to additional_params as it may contain
+ # some data which the subclass hook can use to fetch other paramaters
 	my $additional_params = $ds->additional_params( $opts, $response );
 
 	if ( ref $additional_params ne 'HASH' ) {
@@ -124,7 +124,7 @@ sub _process {
 
 	if ( !$ds->type || $ds->type !~ /^(standard|longitudinal)$/ ) {
 		throw_app_hook_exception( error =>
-                   "Datasource type (i.e. standard/longitudinal) is not speciifed for datasource '$opts->{datasource}'"
+                   "Datasource type (i.e. standard/longitudinal) is not specified for datasource '$opts->{datasource}'"
 		);
 	}
 
@@ -158,21 +158,20 @@ sub _process {
 
 	if ( $ds->type eq 'longitudinal' ) {
 
-	        # Visit variables are only set if the datasource is longitudinal and contains
-	        # data on at least 2 visits; visit variables are used in compare command
+	 # Visit variables are only set if the datasource is longitudinal and contains
+	 # data on at least 2 visits; visit variables are used in compare command
 		if ( $ds->visit_max && $ds->visit_max > 1 ) {
 			 $ds->set_visit_variables;
 		}
 
-                # If visit max is either undefined or <= 1 set datasource type to standard
-                # At the start of some study there may not be any data in any dynamic table or
-                # data may only be available for the first visit
+  # If visit max is either undefined or <= 1 set datasource type to standard
+  # At the start of some study there may not be any data in any dynamic table or
+  # data may only be available for the first visit
 		if ( ( $ds->visit_max && $ds->visit_max < 2 ) || !$ds->visit_max ) {
 			   $ds->{type} = 'standard';
 
 			if ( $opts->{verbose} ) {
-				print STDERR
-                                   "Datasource is set to standard because visit max is either undefined or less than 2 ...\n";
+				print STDERR "Datasource is set to standard because visit max is either undefined or less than 2 ...\n";
 			}
 		}
 	}
@@ -383,14 +382,14 @@ sub set_variable_params {
 		my $k = $v->{table} . '.' . $v->{variable};
 
 		for my $c ( keys %$map ) {
-                        # Add all variable attributes
+   # Add all variable attributes
 			$self->{variables}{$k}{$c} = $v->{$c};
 		}
 
 		# Set 'category' and 'type' attributes if not set
 		$self->{variables}{$k}{category} = $v->{'category'} || undef,
 		$self->{variables}{$k}{type} =
-		  $datatype_map->{ $v->{type} } || 'CHAR(1000)';
+		  $datatype_map->{ $v->{type} } || 'CHAR(255)';
 	}
 }
 
@@ -747,7 +746,17 @@ B<Note> C<-columns> hash must define C<variable> and C<table> columns. Again it 
           
 =head2 datatype_map()
 
-This method should return a hash ref with variable type as keys and equivalent SQL type (i.e. castable) as hash values. For example, in some datasource the datatype int can be converted to database signed and float to decimal. By default, all variable values are assumed to be varchar(255).
+This method should return a hash ref with value types as keys and equivalent SQL types (i.e. castable) as hash values. For example, 
+
+      {
+          'int'        => 'signed',
+          'float'      => 'decimal',
+          'number_1dp' => 'decimal(10,1)',
+          'datetime'   => 'datetime'
+      }
+
+
+By default, the value type is assumed to be varchar(255).
 
 =head1 DIAGNOSTICS
 

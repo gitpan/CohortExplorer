@@ -3,7 +3,7 @@ package CohortExplorer::Command::Menu;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw( CLI::Framework::Command::Menu );
 

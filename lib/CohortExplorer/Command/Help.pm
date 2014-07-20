@@ -4,13 +4,13 @@ use base qw( CLI::Framework::Command::Meta );
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 #-------
 
 sub usage_text {
 
-	q{
+	       q{
            help [command]: application or command specific usage
          };
 }

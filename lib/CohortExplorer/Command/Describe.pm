@@ -3,7 +3,7 @@ package CohortExplorer::Command::Describe;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -12,7 +12,7 @@ use CLI::Framework::Exceptions qw( :all );
 
 sub usage_text {
 
-	 q{
+	        q{
             describe : show datasource description including the entity count 
           };
 

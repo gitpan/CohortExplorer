@@ -3,7 +3,7 @@ package CohortExplorer::Application;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CLI::Framework::Application);
 use Carp;
@@ -137,8 +137,8 @@ sub render {
 
 	my ( $app, $output ) = @_;
 
-        # All commands except help return hash where key is headingText (table heading)
-        # and value is ref to array of arrays containing column values
+ # All commands except help return hash where key is headingText (table heading)
+ # and value is ref to array of arrays containing column values
 	if ( ref $output eq 'HASH' ) {
 		require Text::ASCIITable;
 
@@ -222,7 +222,8 @@ sub handle_exception {
 	}
 
 	else
-	{ # Print application initialization related errors (source CohortExplorer::Datasource)
+	{ 
+  # Print application initialization related errors (source CohortExplorer::Datasource)
 		$app->render( $e->description . "\n\n" );
 
 	}
@@ -462,8 +463,8 @@ sub init {
 
 	require Text::CSV_XS;
 
-        # initialize the datasource and store the datasource object along with other bits
-        # in cache for further use
+ # initialize the datasource and store the datasource object along with other bits
+ # in cache for further use
 	$app->cache->set(
 		cache => {
 			datasource =>

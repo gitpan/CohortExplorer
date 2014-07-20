@@ -3,7 +3,7 @@ package CohortExplorer::Application::REDCap::Datasource;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CohortExplorer::Datasource);
 
@@ -47,7 +47,7 @@ sub additional_params {
 
 	my ( $self, $opts, $response ) = @_;
 
-        # Get static tables and dynamic_event_ids (i.e. comma separated event_ids of all repeating forms)
+ # Get static tables and dynamic_event_ids (i.e. comma separated event_ids of all repeating forms)
 	my $row = $self->dbh->selectall_arrayref(
         "SELECT GROUP_CONCAT( DISTINCT IF (form_count = 1, form, NULL)) AS static_tables,  GROUP_CONCAT(DISTINCT IF (form_count > 1, dynamic_event_id, NULL)) AS dynamic_event_ids FROM ( SELECT GROUP_CONCAT( DISTINCT ref.form_name ) AS form, MIN(ref.event_id) AS dynamic_event_id, COUNT(ref.event_id) AS form_count, GROUP_CONCAT( DISTINCT rea.arm_id ORDER BY rea.arm_id ) AS arm FROM redcap_events_forms AS ref INNER JOIN redcap_events_metadata AS rem ON ref.event_id=rem.event_id INNER JOIN redcap_events_arms AS rea ON rea.arm_id = rem.arm_id WHERE rea.project_id = ? GROUP BY ref.form_name, rea.arm_id ORDER BY ref.event_id) AS x GROUP BY arm ORDER BY arm",
 		undef, $response->{project_id}
@@ -72,7 +72,7 @@ sub additional_params {
 		$response->{type} = 'standard';
 	}
 
-        # Get a list of records/entities the user has access to
+ # Get a list of records/entities the user has access to
 	if ( $response->{group_id} ) {
 		 $response->{allowed_records} = $self->dbh->selectcol_arrayref(
            "SELECT record FROM redcap_data WHERE project_id = ? AND field_name = '__GROUPID__' AND value = ?",
@@ -144,8 +144,8 @@ sub table_structure {
 		arm            => "GROUP_CONCAT( DISTINCT rea.arm_name)",
 		table          => 'GROUP_CONCAT( DISTINCT rm.form_name)',
 		label          => 'GROUP_CONCAT( DISTINCT rm.form_menu_description)',
-		variable_count => 'COUNT(rm.field_name)',
-		event_count    => 'COUNT(DISTINCT rem.day_offset)',
+		variable_count => 'COUNT( DISTINCT rm.field_name)',
+		event_count    => 'COUNT( DISTINCT rem.day_offset)',
 		event_description =>
         "GROUP_CONCAT(DISTINCT CONCAT( rem.descrip, '(', rem.day_offset,')' ) ORDER BY rem.day_offset SEPARATOR '\n ')"
 	);

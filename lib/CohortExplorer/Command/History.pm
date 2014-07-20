@@ -3,7 +3,7 @@ package CohortExplorer::Command::History;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -13,7 +13,7 @@ use CohortExplorer::Command::Query qw($COMMAND_HISTORY);
 
 sub usage_text {
 
-	q{
+	       q{
            history [--show|s] [--clear|c] : show saved commands
          };
 }

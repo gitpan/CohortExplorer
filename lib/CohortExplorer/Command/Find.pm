@@ -3,7 +3,7 @@ package CohortExplorer::Command::Find;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CLI::Framework::Command);
 use CLI::Framework::Exceptions qw( :all );
@@ -13,7 +13,7 @@ use Exception::Class::TryCatch;
 
 sub usage_text {
 
-	q{
+	      q{
            find [--fuzzy|f] [--ignore-case|i] [--and|a] [keyword] : find variables using keywords
 
          
@@ -79,11 +79,10 @@ sub run {
 	# Get the existing 'OR' within $struct (if any)
 	my $OR_condition = $struct->{$condition_key}{-or};
 
-        # By default assume the user is interested in finding variables which contain at least one of the
-        # supplied keywords in at least one of the variable attributes
-        # If there is already a 'OR' within $struct->{$condition_key} then merge two conditions
-
-	$struct->{ $struct->{-group_by} ? -having : -where }{-or} = [
+ # By default assume the user is interested in finding variables which contain at least one of the
+ # supplied keywords in at least one of the variable attributes
+ # If there is already a 'OR' within $struct->{$condition_key} then merge two conditions
+ $struct->{ $struct->{-group_by} ? -having : -where }{-or} = [
 		map {
 			{
 				$opts->{ignore_case} ? "UPPER($_)" : $_ => [
@@ -128,7 +127,7 @@ sub run {
 		throw_cmd_run_exception( error => $e );
 	}
 
-        # Modify query to allow case insensitve search for tables that store metadata in EAV format (e.g. Opal)
+ # Modify query to allow case insensitve search for tables that store metadata in EAV format (e.g. Opal)
 	my $order_by = $1 if ( $stmt =~ /(ORDER BY\s+.+)$/ );
 	$stmt =~ s/ORDER BY .+$//;
 

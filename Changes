@@ -71,3 +71,11 @@ Revision history for CohortExplorer
 0.12   2014-07-11
 
         - Documentation corrections 
+
+0.13   2014-07-20
+
+        - Fixed bug in REDCap datasource API:
+          variable_count in describe command does not show count of unique variables
+  
+        - Documentation corrections 
+ 

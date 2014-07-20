@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 our ( $COMMAND_HISTORY_FILE, $COMMAND_HISTORY_CONFIG, $COMMAND_HISTORY );
 our @EXPORT_OK = qw($COMMAND_HISTORY);
 my $ARG_MAX = 500;
@@ -170,10 +170,10 @@ sub validate {
 			if ( $opr && $val && $csv->parse($val) ) {
 				my @val = grep ( s/^\s*|\s*$//g, $csv->fields );
 
-                                # Operators between and not_between require array but for others it is optional
+    # Operators between and not_between require array but for others it is optional
 				if ( $opr =~ /(between)/ && scalar @val != 2 ) {
 					throw_cmd_validation_exception( error =>
-                                        "Expecting min and max for '$opr' in '$v' (i.e. 'between, min, max' )"
+              "Expecting min and max for '$opr' in '$v' (i.e. 'between, min, max' )"
 					);
 				}
 			}
@@ -250,11 +250,11 @@ sub process {
 
 	##----- PREPARE QUERY PARAMETERS FROM CONDITION OPTION AND ARGS -----##
 
-        # Query parameters can be static, dynamic or both
-        # Static type is applicable to 'standard' datasource but it may also be applicable
-        # to 'longitudinal' datasource provided the datasource contains tables which
-        # are independent of visits (i.e. static tables). Dynamic type only applies to
-        # longitudinal datasources
+ # Query parameters can be static, dynamic or both
+ # Static type is applicable to 'standard' datasource but it may also be applicable
+ # to 'longitudinal' datasource provided the datasource contains tables which
+ # are independent of visits (i.e. static tables). Dynamic type only applies to
+ # longitudinal datasources
 	my $params = $self->create_query_params( $opts, @args );
 
 	my ( $stmt, $var, $sth, @rows );
@@ -322,8 +322,8 @@ sub process {
 	# Both static and dynamic parameters are present
 	else {
 
-        # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
-        # Inner join is done when conditions are imposed on static tables alone
+  # Give priority to visit dependent tables (i.e. dynamic tables) therefore do left join
+  # Inner join is done when conditions are imposed on static tables alone
 		$stmt =
 		    'SELECT dynamic.entity_id, '
 		  . join( ', ', map { @{ $var->{$_} } } keys %$var )
@@ -471,8 +471,8 @@ sub export {
 		# Get column names-SQL pairs
 		$struct->{-columns} = $ds->entity_columns;
 
-                # Construct sql query with a placeholder for table name
-                # Columns follow the order: entity_id, variable, value and visit (if applicable)
+  # Construct sql query with a placeholder for table name
+  # Columns follow the order: entity_id, variable, value and visit (if applicable)
 		eval {
 			( $stmt, @bind ) = $ds->sqla->select(
 				-columns => [
@@ -493,9 +493,9 @@ sub export {
 
 		$sth = $ds->dbh->prepare_cached($stmt);
 
-                # The user might have supplied multiple conditions in the where clause
-                # of entity_structure() method so split the $stmt by '?' and get the index of
-                # 'table' placeholder
+  # The user might have supplied multiple conditions in the where clause
+  # of entity_structure() method so split the $stmt by '?' and get the index of
+  # 'table' placeholder
 		my @chunk = split /\?/, $stmt;
 		my ($placeholder) =
 		  grep ( $chunk[$_] =~ /\s+$struct->{-columns}{table}\s+=\s+/,
@@ -503,7 +503,7 @@ sub export {
 
 		for my $table ( @{ $opts->{export} } ) {
 
-                        # Ensure the user has access to at least one variable in the table to be exported
+   # Ensure the user has access to at least one variable in the table to be exported
 			if ( grep ( /^$table\..+$/, keys %{ $ds->variables } ) ) {
 
 				# Bind table name
@@ -584,10 +584,10 @@ sub summary_stats {
 	  . " ... \n\n"
 	  if ( $cache->{verbose} );
 
-         # Key can be entity_id, visit or none depending on the command (i.e. search/compare) run.
-         # For longitudinal datasources the search command calculates statistics with respect to visit,
-         # hence the key is visit. Standard datasources are not visit based so no key is used.
-         # Compare command uses entity_id as the key when calculating statistics for longitudinal datasources.
+  # Key can be entity_id, visit or none depending on the command (i.e. search/compare) run.
+  # For longitudinal datasources the search command calculates statistics with respect to visit,
+  # hence the key is visit. Standard datasources are not visit based so no key is used.
+  # Compare command uses entity_id as the key when calculating statistics for longitudinal datasources.
 	 require Statistics::Descriptive;
 
 	for my $key (@keys) {
@@ -595,7 +595,7 @@ sub summary_stats {
 		for my $c (@column) {
 			my $sdf = Statistics::Descriptive::Full->new;
 
-			# calculate statistics for integer/decimal variables
+			# Calculate statistics for integer/decimal variables
 			if (   $vars->{$c}
 				&& ( $vars->{$c}{type} =~ /(signed|decimal)/i )
 				&& scalar @{ $data->{$key}{$c} } > 0 )
@@ -618,7 +618,7 @@ sub summary_stats {
 				}
 			}
 
-                        # calculate statistics for categorical variables with type 'text' and boolean variables only
+  # Calculate statistics for categorical variables with type 'text' and boolean variables only
 			elsif ($vars->{$c}
 				&& $vars->{$c}{type} =~ /^char/i
 				&& $vars->{$c}{category} )
@@ -645,7 +645,7 @@ sub summary_stats {
 				  } keys %count;
 			}
 
-                        # For all other variable types (e.g. date, datetime) get no. of observations alone
+   # For all other variable types (e.g. date, datetime) get no. of observations alone
 			else {
 				push @row, sprintf( "N: %3s\n", scalar @{ $data->{$key}{$c} } );
 			}

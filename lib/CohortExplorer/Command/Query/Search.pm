@@ -3,7 +3,7 @@ package CohortExplorer::Command::Query::Search;
 use strict;
 use warnings;
 
-our $VERSION = 0.12;
+our $VERSION = 0.13;
 
 use base qw(CohortExplorer::Command::Query);
 use CLI::Framework::Exceptions qw( :all );
@@ -85,16 +85,16 @@ sub create_query_params {
 	for (@var) {
 		/^([^\.]+)\.(.+)$/;
 
-                # Extract tables and variable names, a variable is referenced as <table>.<variable>
+     # Extract tables and variable names, a variable is referenced as <table>.<variable>
 		my $table_type =
 		  $ds_type eq 'standard'
 		  ? 'static'
 		  : ( grep ( $_ eq $1, @static_table ) ? 'static' : 'dynamic' );
 
-                # Build a hash with keys 'static' and 'dynamic'.
-                # Each key contains its own SQL parameters
-                # In static tables rows are grouped on entity_id where as in dynamic tables
-                # (i.e. longitudinal datasources) the rows are grouped on entity_id and visit
+  # Build a hash with keys 'static' and 'dynamic'.
+  # Each key contains its own SQL parameters
+  # In static tables rows are grouped on entity_id where as in dynamic tables
+  # (i.e. longitudinal datasources) the rows are grouped on entity_id and visit
 		push
 		  @{ $param{$table_type}{-where}{ $struct->{-columns}{table} }{-in} },
 		  $1;
@@ -133,7 +133,7 @@ sub create_query_params {
 
 		else {
 
-		        # entity_id and visit are added to the list of SQL cols in dynamic param
+		 # entity_id and visit are added to the list of SQL cols in dynamic param
 			unshift @{ $param{$_}{-columns} },
 			  (
 				$struct->{-columns}{entity_id} . ' AS `entity_id`',
